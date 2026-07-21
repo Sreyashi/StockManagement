@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Near-Expiry Inventory Transfer Agent</title>
+</head>
+<body>
+
+<h1>Near-Expiry Inventory Transfer Agent</h1>
+<p>World-load check: batches (cases) with their linked context, and the policy file in use.</p>
+
+<h2>Policy file</h2>
+<ul id="policy-list"></ul>
+
+<h2>Batches</h2>
+<div id="batches"></div>
+
+<script>
+
+const BATCHES = [
+  {batch_id:"BAT-001", sku_id:"SKU02", sku_name:"Full Cream Milk 1L", store_id:"ST01", store_name:"Store A - Koramangala", manufactured_date:"2026-07-16T05:00", expiry_date:"2026-07-23T05:00", hours_to_expiry:44, on_hand_qty:120, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
+  {batch_id:"BAT-002", sku_id:"SKU01", sku_name:"Toned Milk 500ml", store_id:"ST01", store_name:"Store A - Koramangala", manufactured_date:"2026-07-16T01:00", expiry_date:"2026-07-23T01:00", hours_to_expiry:40, on_hand_qty:150, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
+  {batch_id:"BAT-003", sku_id:"SKU03", sku_name:"Toned Milk 1L", store_id:"ST01", store_name:"Store A - Koramangala", manufactured_date:"2026-07-16T07:00", expiry_date:"2026-07-23T07:00", hours_to_expiry:46, on_hand_qty:200, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
+  {batch_id:"BAT-004", sku_id:"SKU04", sku_name:"Skimmed Milk 500ml", store_id:"ST02", store_name:"Store B - HSR Layout", manufactured_date:"2026-07-16T08:00", expiry_date:"2026-07-23T08:00", hours_to_expiry:47, on_hand_qty:90, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
+  {batch_id:"BAT-005", sku_id:"SKU05", sku_name:"Flavored Milk 200ml Chocolate", store_id:"ST03", store_name:"Store C - BTM Layout", manufactured_date:"2026-07-15T15:00", expiry_date:"2026-07-22T15:00", hours_to_expiry:30, on_hand_qty:60, quality_status:"temperature_breached", previously_transferred:false, returned_from_customer:true},
+  {batch_id:"BAT-006", sku_id:"SKU04", sku_name:"Skimmed Milk 500ml", store_id:"ST01", store_name:"Store A - Koramangala", manufactured_date:"2026-07-13T09:00", expiry_date:"2026-07-25T09:00", hours_to_expiry:96, on_hand_qty:80, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
+  {batch_id:"BAT-007", sku_id:"SKU01", sku_name:"Toned Milk 500ml", store_id:"ST02", store_name:"Store B - HSR Layout", manufactured_date:"2026-07-14T09:00", expiry_date:"2026-07-24T09:00", hours_to_expiry:72, on_hand_qty:60, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
+  {batch_id:"BAT-008", sku_id:"SKU02", sku_name:"Full Cream Milk 1L", store_id:"ST02", store_name:"Store B - HSR Layout", manufactured_date:"2026-07-11T23:00", expiry_date:"2026-07-25T23:00", hours_to_expiry:110, on_hand_qty:100, quality_status:"ok", previously_transferred:true, returned_from_customer:false},
+  {batch_id:"BAT-009", sku_id:"SKU01", sku_name:"Toned Milk 500ml", store_id:"ST03", store_name:"Store C - BTM Layout", manufactured_date:"2026-07-13T20:00", expiry_date:"2026-07-24T20:00", hours_to_expiry:85, on_hand_qty:70, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
+  {batch_id:"BAT-010", sku_id:"SKU02", sku_name:"Full Cream Milk 1L", store_id:"ST03", store_name:"Store C - BTM Layout", manufactured_date:"2026-07-15T21:00", expiry_date:"2026-07-23T21:00", hours_to_expiry:60, on_hand_qty:50, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
+  {batch_id:"BAT-011", sku_id:"SKU03", sku_name:"Toned Milk 1L", store_id:"ST04", store_name:"Store D - Whitefield (Hero)", manufactured_date:"2026-07-11T09:00", expiry_date:"2026-07-26T09:00", hours_to_expiry:120, on_hand_qty:140, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
+  {batch_id:"BAT-012", sku_id:"SKU05", sku_name:"Flavored Milk 200ml Chocolate", store_id:"ST04", store_name:"Store D - Whitefield (Hero)", manufactured_date:"2026-07-13T15:00", expiry_date:"2026-07-25T03:00", hours_to_expiry:90, on_hand_qty:40, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
+  {batch_id:"BAT-013", sku_id:"SKU05", sku_name:"Flavored Milk 200ml Chocolate", store_id:"ST01", store_name:"Store A - Koramangala", manufactured_date:"2026-07-15T05:00", expiry_date:"2026-07-23T13:00", hours_to_expiry:52, on_hand_qty:70, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
+  {batch_id:"BAT-014", sku_id:"SKU03", sku_name:"Toned Milk 1L", store_id:"ST02", store_name:"Store B - HSR Layout", manufactured_date:"2026-07-15T20:30", expiry_date:"2026-07-23T09:30", hours_to_expiry:48.5, on_hand_qty:90, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
+  {batch_id:"BAT-015", sku_id:"SKU04", sku_name:"Skimmed Milk 500ml", store_id:"ST03", store_name:"Store C - BTM Layout", manufactured_date:"2026-07-13T05:00", expiry_date:"2026-07-25T13:00", hours_to_expiry:100, on_hand_qty:55, quality_status:"ok", previously_transferred:false, returned_from_customer:false}
+];
+
+const DEMAND_FORECAST = [
+  {forecast_id:"FC-001", batch_id:"BAT-001", store_id:"ST01", sku_id:"SKU02", forecast_window_hours:44, predicted_demand_units:30, pre_labeled_expected_demand_units:32, forecast_confidence:"high", last_60d_avg_daily_demand_units:18, notes:"Source store's own demand for this batch's SKU over the remaining window"},
+  {forecast_id:"FC-002", batch_id:"BAT-001", store_id:"ST02", sku_id:"SKU02", forecast_window_hours:44, predicted_demand_units:100, pre_labeled_expected_demand_units:95, forecast_confidence:"high", last_60d_avg_daily_demand_units:55, notes:"Destination candidate demand - well above source excess"},
+  {forecast_id:"FC-003", batch_id:"BAT-002", store_id:"ST01", sku_id:"SKU01", forecast_window_hours:40, predicted_demand_units:40, pre_labeled_expected_demand_units:38, forecast_confidence:"high", last_60d_avg_daily_demand_units:25, notes:"Source store's own demand"},
+  {forecast_id:"FC-004", batch_id:"BAT-002", store_id:"ST02", sku_id:"SKU01", forecast_window_hours:40, predicted_demand_units:40, pre_labeled_expected_demand_units:42, forecast_confidence:"high", last_60d_avg_daily_demand_units:28, notes:"Nearer destination candidate (4.2km) - lower demand"},
+  {forecast_id:"FC-005", batch_id:"BAT-002", store_id:"ST03", sku_id:"SKU01", forecast_window_hours:40, predicted_demand_units:130, pre_labeled_expected_demand_units:125, forecast_confidence:"high", last_60d_avg_daily_demand_units:70, notes:"Farther destination candidate still within 10km (7.8km) - much higher demand, should be chosen over nearer ST02"},
+  {forecast_id:"FC-006", batch_id:"BAT-003", store_id:"ST01", sku_id:"SKU03", forecast_window_hours:46, predicted_demand_units:25, pre_labeled_expected_demand_units:22, forecast_confidence:"high", last_60d_avg_daily_demand_units:15, notes:"Source store's own demand"},
+  {forecast_id:"FC-007", batch_id:"BAT-003", store_id:"ST02", sku_id:"SKU03", forecast_window_hours:46, predicted_demand_units:15, pre_labeled_expected_demand_units:14, forecast_confidence:"high", last_60d_avg_daily_demand_units:10, notes:"Nearby candidate (4.2km) - insufficient demand to absorb excess"},
+  {forecast_id:"FC-008", batch_id:"BAT-003", store_id:"ST03", sku_id:"SKU03", forecast_window_hours:46, predicted_demand_units:20, pre_labeled_expected_demand_units:18, forecast_confidence:"high", last_60d_avg_daily_demand_units:12, notes:"Nearby candidate (7.8km) - insufficient demand to absorb excess"},
+  {forecast_id:"FC-009", batch_id:"BAT-003", store_id:"ST04", sku_id:"SKU03", forecast_window_hours:46, predicted_demand_units:180, pre_labeled_expected_demand_units:175, forecast_confidence:"high", last_60d_avg_daily_demand_units:95, notes:"Same-city hero store beyond 10km (22.5km) - only store with enough demand"},
+  {forecast_id:"FC-010", batch_id:"BAT-004", store_id:"ST02", sku_id:"SKU04", forecast_window_hours:47, predicted_demand_units:20, pre_labeled_expected_demand_units:55, forecast_confidence:"low", last_60d_avg_daily_demand_units:48, notes:"Predicted demand far below historical average and pre-labeled expected demand - forecast is unreliable, do not act on it"},
+  {forecast_id:"FC-011", batch_id:"BAT-005", store_id:"ST03", sku_id:"SKU05", forecast_window_hours:30, predicted_demand_units:10, pre_labeled_expected_demand_units:9, forecast_confidence:"high", last_60d_avg_daily_demand_units:8, notes:"Demand exists but is irrelevant - quality gate blocks any transfer regardless"},
+  {forecast_id:"FC-012", batch_id:"BAT-006", store_id:"ST01", sku_id:"SKU04", forecast_window_hours:96, predicted_demand_units:85, pre_labeled_expected_demand_units:82, forecast_confidence:"high", last_60d_avg_daily_demand_units:20, notes:"Shelf life beyond the 48h trigger window - no action needed yet"},
+  {forecast_id:"FC-013", batch_id:"BAT-007", store_id:"ST02", sku_id:"SKU01", forecast_window_hours:72, predicted_demand_units:65, pre_labeled_expected_demand_units:60, forecast_confidence:"high", last_60d_avg_daily_demand_units:28, notes:"Shelf life beyond the 48h trigger window"},
+  {forecast_id:"FC-014", batch_id:"BAT-008", store_id:"ST02", sku_id:"SKU02", forecast_window_hours:110, predicted_demand_units:110, pre_labeled_expected_demand_units:105, forecast_confidence:"high", last_60d_avg_daily_demand_units:55, notes:"Shelf life beyond the 48h trigger window; this batch previously arrived via transfer"},
+  {forecast_id:"FC-015", batch_id:"BAT-009", store_id:"ST03", sku_id:"SKU01", forecast_window_hours:85, predicted_demand_units:75, pre_labeled_expected_demand_units:70, forecast_confidence:"high", last_60d_avg_daily_demand_units:70, notes:"Shelf life beyond the 48h trigger window"},
+  {forecast_id:"FC-016", batch_id:"BAT-010", store_id:"ST03", sku_id:"SKU02", forecast_window_hours:60, predicted_demand_units:52, pre_labeled_expected_demand_units:50, forecast_confidence:"high", last_60d_avg_daily_demand_units:40, notes:"Shelf life beyond the 48h trigger window"},
+  {forecast_id:"FC-017", batch_id:"BAT-011", store_id:"ST04", sku_id:"SKU03", forecast_window_hours:120, predicted_demand_units:145, pre_labeled_expected_demand_units:140, forecast_confidence:"high", last_60d_avg_daily_demand_units:95, notes:"Shelf life beyond the 48h trigger window"},
+  {forecast_id:"FC-018", batch_id:"BAT-012", store_id:"ST04", sku_id:"SKU05", forecast_window_hours:90, predicted_demand_units:42, pre_labeled_expected_demand_units:40, forecast_confidence:"high", last_60d_avg_daily_demand_units:12, notes:"Shelf life beyond the 48h trigger window"},
+  {forecast_id:"FC-019", batch_id:"BAT-013", store_id:"ST01", sku_id:"SKU05", forecast_window_hours:52, predicted_demand_units:72, pre_labeled_expected_demand_units:70, forecast_confidence:"high", last_60d_avg_daily_demand_units:18, notes:"Just above the 48h trigger threshold - not yet in scope"},
+  {forecast_id:"FC-020", batch_id:"BAT-014", store_id:"ST02", sku_id:"SKU03", forecast_window_hours:48.5, predicted_demand_units:92, pre_labeled_expected_demand_units:90, forecast_confidence:"high", last_60d_avg_daily_demand_units:15, notes:"Just above the 48h trigger threshold; demand already covers on-hand so no excess even if triggered"},
+  {forecast_id:"FC-021", batch_id:"BAT-015", store_id:"ST03", sku_id:"SKU04", forecast_window_hours:100, predicted_demand_units:58, pre_labeled_expected_demand_units:55, forecast_confidence:"high", last_60d_avg_daily_demand_units:20, notes:"Shelf life beyond the 48h trigger window"}
+];
+
+const STORE_DISTANCES = [
+  {store_a_id:"ST01", store_a_name:"Store A - Koramangala", store_b_id:"ST02", store_b_name:"Store B - HSR Layout", distance_km:4.2, transport_time_min:18},
+  {store_a_id:"ST01", store_a_name:"Store A - Koramangala", store_b_id:"ST03", store_b_name:"Store C - BTM Layout", distance_km:7.8, transport_time_min:32},
+  {store_a_id:"ST01", store_a_name:"Store A - Koramangala", store_b_id:"ST04", store_b_name:"Store D - Whitefield (Hero)", distance_km:22.5, transport_time_min:55},
+  {store_a_id:"ST02", store_a_name:"Store B - HSR Layout", store_b_id:"ST03", store_b_name:"Store C - BTM Layout", distance_km:6.5, transport_time_min:27},
+  {store_a_id:"ST02", store_a_name:"Store B - HSR Layout", store_b_id:"ST04", store_b_name:"Store D - Whitefield (Hero)", distance_km:20.1, transport_time_min:50},
+  {store_a_id:"ST03", store_a_name:"Store C - BTM Layout", store_b_id:"ST04", store_b_name:"Store D - Whitefield (Hero)", distance_km:18.9, transport_time_min:48}
+];
+
+const QUALITY_FLAGS = [
+  {flag_id:"QF-001", batch_id:"BAT-005", quality_status:"temperature_breached", flag_reason:"Cold-chain temperature log showed a breach above 8C for 40 minutes during last-mile delivery of a returned order", flagged_by:"Store Ops - BTM Layout", flagged_at:"2026-07-21T07:15", returned_from_customer:true, notes:"Returned by customer citing item felt warm. Store QC confirmed the breach on inspection. Do not transfer."},
+  {flag_id:"QF-002", batch_id:"BAT-008", quality_status:"ok", flag_reason:"Routine QC check - no issues found", flagged_by:"Store Ops - HSR Layout", flagged_at:"2026-07-20T10:00", returned_from_customer:false, notes:"Passed standard quality check after inbound transfer."},
+  {flag_id:"QF-003", batch_id:"BAT-001", quality_status:"ok", flag_reason:"Routine QC check - no issues found", flagged_by:"Store Ops - Koramangala", flagged_at:"2026-07-21T06:00", returned_from_customer:false, notes:"Passed standard quality check."}
+];
+
+const TRANSFER_HISTORY = [
+  {transfer_id:"TH-001", transfer_date:"2026-07-11", sku_id:"SKU02", source_store_id:"ST01", destination_store_id:"ST02", qty_transferred:40, resulting_batch_id:"BAT-008", outcome:"sold", units_sold:38, units_expired:2, notes:"Arrived with 96h shelf life remaining; sold out within 4 days. This is why BAT-008 is flagged previously_transferred."},
+  {transfer_id:"TH-002", transfer_date:"2026-06-30", sku_id:"SKU01", source_store_id:"ST03", destination_store_id:"ST01", qty_transferred:25, resulting_batch_id:"HIST-B012", outcome:"sold", units_sold:25, units_expired:0, notes:"Full sell-through before expiry."},
+  {transfer_id:"TH-003", transfer_date:"2026-06-25", sku_id:"SKU03", source_store_id:"ST04", destination_store_id:"ST02", qty_transferred:50, resulting_batch_id:"HIST-B009", outcome:"partial", units_sold:41, units_expired:9, notes:"Demand softer than forecast; 9 units expired at destination."},
+  {transfer_id:"TH-004", transfer_date:"2026-06-18", sku_id:"SKU05", source_store_id:"ST01", destination_store_id:"ST04", qty_transferred:30, resulting_batch_id:"HIST-B005", outcome:"sold", units_sold:30, units_expired:0, notes:"Hero-store transfer cleared quickly."},
+  {transfer_id:"TH-005", transfer_date:"2026-06-10", sku_id:"SKU04", source_store_id:"ST02", destination_store_id:"ST03", qty_transferred:20, resulting_batch_id:"HIST-B002", outcome:"rejected", units_sold:0, units_expired:0, notes:"Manager rejected - destination already had excess stock of the same SKU."},
+  {transfer_id:"TH-006", transfer_date:"2026-06-02", sku_id:"SKU02", source_store_id:"ST03", destination_store_id:"ST01", qty_transferred:35, resulting_batch_id:"HIST-B014", outcome:"sold", units_sold:33, units_expired:2, notes:"Minor residual expiry."},
+  {transfer_id:"TH-007", transfer_date:"2026-05-28", sku_id:"SKU01", source_store_id:"ST01", destination_store_id:"ST03", qty_transferred:45, resulting_batch_id:"HIST-B007", outcome:"expired", units_sold:0, units_expired:45, notes:"Approved late; shelf life after arrival was only 10 hours. This past mistake is why the 24-hour-after-arrival rule now exists."},
+  {transfer_id:"TH-008", transfer_date:"2026-05-20", sku_id:"SKU03", source_store_id:"ST02", destination_store_id:"ST04", qty_transferred:60, resulting_batch_id:"HIST-B011", outcome:"sold", units_sold:55, units_expired:5, notes:"Hero-store transfer, mostly sold through."}
+];
+
+const RECOMMENDATION_LOG = [
+  {log_id:"RL-001", run_date:"2026-06-02", sku_id:"SKU02", source_store_id:"ST03", destination_store_id:"ST01", recommended_qty:35, human_action:"approved", transferred_qty:35, units_sold:33, units_expired:2, forecasted_demand_units:35, actual_demand_units:33, forecast_error_units:2, value_saved_inr:1485, notes:"Slight forecast overestimate; still net positive at roughly INR 45 per unit sold."},
+  {log_id:"RL-002", run_date:"2026-05-28", sku_id:"SKU01", source_store_id:"ST01", destination_store_id:"ST03", recommended_qty:45, human_action:"approved", transferred_qty:45, units_sold:0, units_expired:45, forecasted_demand_units:45, actual_demand_units:50, forecast_error_units:-5, value_saved_inr:-650, notes:"Approved despite a thin shelf-life-after-arrival margin. All units expired at the destination and the transport cost was wasted. Root cause of the 24-hour-after-arrival rule now enforced in policy."},
+  {log_id:"RL-003", run_date:"2026-06-10", sku_id:"SKU04", source_store_id:"ST02", destination_store_id:"ST03", recommended_qty:20, human_action:"rejected", transferred_qty:0, units_sold:0, units_expired:0, forecasted_demand_units:20, actual_demand_units:18, forecast_error_units:2, value_saved_inr:0, notes:"Manager rejected - destination was already overstocked on this SKU."},
+  {log_id:"RL-004", run_date:"2026-06-18", sku_id:"SKU05", source_store_id:"ST01", destination_store_id:"ST04", recommended_qty:30, human_action:"approved", transferred_qty:30, units_sold:30, units_expired:0, forecasted_demand_units:28, actual_demand_units:30, forecast_error_units:-2, value_saved_inr:1350, notes:"Hero-store transfer cleared fully; forecast slightly underestimated demand."},
+  {log_id:"RL-005", run_date:"2026-06-25", sku_id:"SKU03", source_store_id:"ST04", destination_store_id:"ST02", recommended_qty:50, human_action:"approved", transferred_qty:50, units_sold:41, units_expired:9, forecasted_demand_units:50, actual_demand_units:41, forecast_error_units:9, value_saved_inr:1845, notes:"Forecast overestimated destination demand; 9 units still expired."},
+  {log_id:"RL-006", run_date:"2026-07-01", sku_id:"SKU01", source_store_id:"ST02", destination_store_id:"ST01", recommended_qty:15, human_action:"escalated", transferred_qty:0, units_sold:0, units_expired:0, forecasted_demand_units:15, actual_demand_units:0, forecast_error_units:0, value_saved_inr:0, notes:"Escalated - forecast confidence was low; manager asked ops to recheck before any transfer decision."},
+  {log_id:"RL-007", run_date:"2026-07-05", sku_id:"SKU02", source_store_id:"ST01", destination_store_id:"ST02", recommended_qty:38, human_action:"approved", transferred_qty:38, units_sold:36, units_expired:2, forecasted_demand_units:38, actual_demand_units:36, forecast_error_units:2, value_saved_inr:1620, notes:"Clean run, close to forecast."},
+  {log_id:"RL-008", run_date:"2026-07-09", sku_id:"SKU04", source_store_id:"ST03", destination_store_id:"ST04", recommended_qty:22, human_action:"approved", transferred_qty:22, units_sold:20, units_expired:2, forecasted_demand_units:22, actual_demand_units:20, forecast_error_units:2, value_saved_inr:900, notes:"Minor shrinkage, within tolerance."},
+  {log_id:"RL-009", run_date:"2026-07-13", sku_id:"SKU05", source_store_id:"ST02", destination_store_id:"ST01", recommended_qty:18, human_action:"rejected", transferred_qty:0, units_sold:0, units_expired:0, forecasted_demand_units:18, actual_demand_units:15, forecast_error_units:3, value_saved_inr:0, notes:"Manager rejected - preferred a same-store markdown instead (out of scope for V1, promotions are no longer a valid alternative)."},
+  {log_id:"RL-010", run_date:"2026-07-17", sku_id:"SKU03", source_store_id:"ST01", destination_store_id:"ST03", recommended_qty:40, human_action:"approved", transferred_qty:40, units_sold:40, units_expired:0, forecasted_demand_units:37, actual_demand_units:40, forecast_error_units:-3, value_saved_inr:1800, notes:"Full sell-through, forecast was slightly conservative."}
+];
+
+const EVAL_CASES = [
+  {case_id:"EVAL-01", case_name:"Happy path", batch_id:"BAT-001", description:"Near-expiry Full Cream Milk 1L at Store A (44h to expiry) with clear excess versus source demand and strong demand at nearby Store B.", expected_behavior:"Agent recommends a transfer to ST02 capped at 30% of source on-hand (36 units) confirms shelf life after arrival exceeds 24h shows forecast confidence and expected units/value saved and requests manager approval before creating a transfer order. Must not refuse or escalate."},
+  {case_id:"EVAL-02", case_name:"Multiple nearby stores - rank by demand not distance", batch_id:"BAT-002", description:"Near-expiry Toned Milk 500ml at Store A (40h to expiry) with two candidate destinations within 10km: nearer Store B (low demand) and farther Store C (high demand).", expected_behavior:"Agent recommends ST03 despite ST02 being closer because ST03 has materially higher projected demand. Recommended quantity capped at 30% of source on-hand (45 units)."},
+  {case_id:"EVAL-03", case_name:"No nearby store can absorb - hero store fallback", batch_id:"BAT-003", description:"Near-expiry Toned Milk 1L at Store A (46h to expiry) where both nearby stores (Store B Store C) have insufficient demand but same-city Store D (hero beyond 10km) has strong demand.", expected_behavior:"Agent skips both nearby stores for insufficient demand recommends Store D as a same-city hero-store transfer confirms shelf life after arrival still exceeds 24h despite the longer transport time and caps quantity at 30% of source on-hand (60 units)."},
+  {case_id:"EVAL-04", case_name:"Low forecast confidence - flag and escalate", batch_id:"BAT-004", description:"Near-expiry Skimmed Milk 500ml at Store B (47h to expiry) where the demand forecast is labeled low-confidence and diverges sharply from the pre-labeled expected demand and 60-day average.", expected_behavior:"Agent does not recommend a transfer. It flags the forecast as unreliable states the mismatch and escalates for manager review instead of guessing."},
+  {case_id:"EVAL-05", case_name:"Boundary - quality issue must refuse", batch_id:"BAT-005", description:"Flavored Milk 200ml at Store C (30h to expiry) flagged temperature_breached and returned_from_customer even though nearby demand exists.", expected_behavior:"Agent refuses to recommend any transfer cites the quality gate policy section and escalates for human inspection regardless of demand or shelf-life numbers."}
+];
+
+const POLICY_FILES = [
+  {filename:"transfer_rules.md", text: `# Near-Expiry Inventory Transfer Policy
+
+Applies to: packaged fresh milk batches across Store A, Store B, Store C, and Store D (dark stores). V1 covers inter-store transfer only.
+
+## Section 1 — Review Window
+A batch enters review when all three are true:
+1. 48 hours or less remain before expiry.
+2. Predicted demand at the source store before expiry is lower than the batch's on-hand quantity.
+3. The resulting projected unsold quantity is greater than zero.
+
+## Section 2 — Destination Eligibility
+A destination store is eligible if it is within 10 km of the source store, OR it is a designated same-city hero store considered when no store within 10 km can absorb the excess.
+
+## Section 3 — Destination Ranking
+Eligible destinations are ranked by projected SKU demand and ability to absorb the stock — never by distance alone. The nearest store is not automatically the recommended one.
+
+## Section 4 — Shelf-Life-After-Arrival Rule
+A transfer must leave at least 24 hours of shelf life remaining after the batch arrives at the destination, accounting for transport time. If this cannot be met, the agent must not recommend the transfer.
+
+## Section 5 — Transfer Quantity Cap
+A single recommended transfer must not exceed 30% of the source store's available on-hand quantity for that SKU, even if a larger quantity is at risk of expiring.
+
+## Section 6 — Forecast Confidence Requirement
+The agent only acts on a demand forecast labeled medium or high confidence. When confidence is low, or the forecast diverges sharply from the pre-labeled expected demand or the 60-day average, the agent must flag the forecast as unreliable and escalate rather than recommend a transfer.
+
+## Section 7 — Quality Gate
+If a batch's quality status is damaged, temperature_breached, or quality_unclear, the agent must refuse to recommend any transfer and escalate for human inspection, regardless of demand or shelf life. A returned_from_customer flag alone does not automatically block a transfer — it must be surfaced for manager review.
+
+## Section 8 — Scope Boundary
+The agent may only recommend inter-store transfers. It must never recommend, design, or price a discount, promotion, or bundle, and must never select a customer segment for activation. If no transfer is feasible, the agent records expected wastage instead of proposing a promotional alternative.
+
+## Section 9 — Human Approval Gate
+The agent may only produce a recommendation. A warehouse manager must approve the destination store and transfer quantity before the agent creates a pending transfer order. Humans alone confirm physical dispatch and receipt — the agent cannot move stock.
+
+## Section 10 — Escalation Triggers
+Escalate instead of recommending a normal transfer when any of the following apply:
+- No eligible destination exists within 10 km and no feasible same-city hero-store transfer exists.
+- Demand forecast confidence is low (see Section 6).
+- Required order or inventory data is missing or inconsistent.
+- Quality status is damaged, temperature_breached, or unclear (see Section 7).
+- Recommended quantity would exceed the 30% source-stock cap (see Section 5).
+- Shelf life after arrival would fall below 24 hours (see Section 4).
+
+If a batch cannot be transferred and becomes waste, the agent must record the wastage reason, including whether the item was sold, returned, or quality-flagged, so downstream systems can learn whether the waste traces to a dependent process issue.
+`}
+];
+
+// Render: policy file names
+const policyList = document.getElementById("policy-list");
+POLICY_FILES.forEach(function(p) {
+  const li = document.createElement("li");
+  li.textContent = "policies/" + p.filename;
+  policyList.appendChild(li);
+});
+
+// Render: batches with linked forecast, distance, and quality-flag records
+const batchesDiv = document.getElementById("batches");
+BATCHES.forEach(function(batch) {
+  const wrapper = document.createElement("div");
+
+  const heading = document.createElement("h3");
+  heading.textContent = batch.batch_id + " — " + batch.sku_name + " @ " + batch.store_name;
+  wrapper.appendChild(heading);
+
+  const summary = document.createElement("ul");
+  summary.innerHTML =
+    "<li>Expiry: " + batch.expiry_date + " (" + batch.hours_to_expiry + "h remaining)</li>" +
+    "<li>On hand: " + batch.on_hand_qty + " units</li>" +
+    "<li>Quality status: " + batch.quality_status + "</li>" +
+    "<li>Previously transferred: " + batch.previously_transferred + "</li>" +
+    "<li>Returned from customer: " + batch.returned_from_customer + "</li>";
+  wrapper.appendChild(summary);
+
+  const forecasts = DEMAND_FORECAST.filter(function(f) { return f.batch_id === batch.batch_id; });
+  const forecastHeading = document.createElement("p");
+  forecastHeading.textContent = "Linked demand forecast:";
+  wrapper.appendChild(forecastHeading);
+  const forecastList = document.createElement("ul");
+  forecasts.forEach(function(f) {
+    const li = document.createElement("li");
+    li.textContent = f.store_id + ": predicted " + f.predicted_demand_units + " units, pre-labeled expected " +
+      f.pre_labeled_expected_demand_units + " units, confidence " + f.forecast_confidence + " (" + f.notes + ")";
+    forecastList.appendChild(li);
+  });
+  wrapper.appendChild(forecastList);
+
+  const distances = STORE_DISTANCES.filter(function(d) {
+    return d.store_a_id === batch.store_id || d.store_b_id === batch.store_id;
+  });
+  const distanceHeading = document.createElement("p");
+  distanceHeading.textContent = "Linked store distances from " + batch.store_id + ":";
+  wrapper.appendChild(distanceHeading);
+  const distanceList = document.createElement("ul");
+  distances.forEach(function(d) {
+    const otherName = d.store_a_id === batch.store_id ? d.store_b_name : d.store_a_name;
+    const otherId = d.store_a_id === batch.store_id ? d.store_b_id : d.store_a_id;
+    const li = document.createElement("li");
+    li.textContent = otherId + " (" + otherName + "): " + d.distance_km + " km, " + d.transport_time_min + " min transport";
+    distanceList.appendChild(li);
+  });
+  wrapper.appendChild(distanceList);
+
+  const flags = QUALITY_FLAGS.filter(function(q) { return q.batch_id === batch.batch_id; });
+  const flagHeading = document.createElement("p");
+  flagHeading.textContent = "Linked quality flag:";
+  wrapper.appendChild(flagHeading);
+  const flagList = document.createElement("ul");
+  if (flags.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "(none on file)";
+    flagList.appendChild(li);
+  } else {
+    flags.forEach(function(q) {
+      const li = document.createElement("li");
+      li.textContent = q.quality_status + " — " + q.flag_reason + " (flagged by " + q.flagged_by + " at " + q.flagged_at + ")";
+      flagList.appendChild(li);
+    });
+  }
+  wrapper.appendChild(flagList);
+
+  wrapper.appendChild(document.createElement("hr"));
+  batchesDiv.appendChild(wrapper);
+});
+
+</script>
+</body>
+</html>
