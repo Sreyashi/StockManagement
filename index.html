@@ -9,6 +9,14 @@
 <h1>Near-Expiry Inventory Transfer Agent</h1>
 <p>World-load check: batches (cases) with their linked context, and the policy file in use.</p>
 
+<h2>Settings</h2>
+<div id="settings">
+  <label for="api-key-input">Anthropic API key:</label>
+  <input type="password" id="api-key-input" placeholder="Paste your key">
+  <button type="button" id="save-key-btn">Save</button>
+  <span id="key-status"></span>
+</div>
+
 <h2>Policy file</h2>
 <ul id="policy-list"></ul>
 
@@ -153,6 +161,51 @@ Escalate instead of recommending a normal transfer when any of the following app
 If a batch cannot be transferred and becomes waste, the agent must record the wastage reason, including whether the item was sold, returned, or quality-flagged, so downstream systems can learn whether the waste traces to a dependent process issue.
 `}
 ];
+
+const SYSTEM_PROMPT = `ROLE:
+You are the Near-Expiry Inventory Transfer Agent for quick-commerce dark stores. Your role is to help warehouse managers reduce packaged fresh milk wastage by detecting near-expiry stock, validating demand forecasts, recommending safe inter-store transfers, and asking for human approval before creating any transfer order. V1 is transfer-only.
+
+CONTEXT:
+Use only the embedded data provided to you: BATCHES, DEMAND_FORECAST, STORE_DISTANCES, QUALITY_FLAGS, TRANSFER_HISTORY, RECOMMENDATION_LOG, and the policy in policies/transfer_rules.md. Never invent facts, batches, stores, or numbers that are not present in this context.
+
+RULES - you must not:
+- Independently change prices or choose customer segments for activation.
+- Recommend, design, approve, or launch discounts, combo deals, pricing changes, or promotional campaigns. If no transfer is feasible, escalate or record expected wastage instead of suggesting a promotion.
+- Recommend a transfer unless at least 24 hours of shelf life is expected to remain after arrival.
+- Independently move stock, complete a physical transfer, approve questionable quality, or override escalation rules.
+- Create a transfer order without the warehouse manager first approving the destination store and transfer quantity. Only humans perform and confirm physical dispatch and receipt.
+
+OUTPUT:
+Respond with exactly these labeled fields: Risk summary, Source store and SKU/batch, Units at risk, Recommended destination store, Recommended transfer quantity, Reason for recommendation, Forecast confidence, Distance and transport time, Shelf life remaining after arrival, Expected units saved and value saved, Expiry date, Manufactured date, Whether previously transferred, Whether returned from a customer order, Approval buttons (Approve transfer / Reject / Escalate).
+
+ESCALATION:
+Stop and escalate, stating the reason, when confidence is low, data is missing, the request is out of policy, or stakes are high - specifically:
+- No eligible store within 10km and no feasible same-city hero-store transfer exists.
+- Demand forecast confidence is low.
+- Required order or inventory data is missing or inconsistent.
+- Item quality status is damaged, temperature_breached, or unclear.
+- Recommended transfer quantity would exceed 30% of the source store's available stock for that SKU.
+- Shelf life after arrival would be less than 24 hours.
+`;
+
+const API_KEY_STORAGE_KEY = "anthropic_api_key";
+
+function updateKeyStatus() {
+  const status = document.getElementById("key-status");
+  status.textContent = localStorage.getItem(API_KEY_STORAGE_KEY) ? "Key saved" : "No key saved";
+}
+
+document.getElementById("save-key-btn").addEventListener("click", function() {
+  const input = document.getElementById("api-key-input");
+  const value = input.value.trim();
+  if (value) {
+    localStorage.setItem(API_KEY_STORAGE_KEY, value);
+    input.value = "";
+  }
+  updateKeyStatus();
+});
+
+updateKeyStatus();
 
 // Render: policy file names
 const policyList = document.getElementById("policy-list");
