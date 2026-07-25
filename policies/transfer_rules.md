@@ -12,7 +12,7 @@ A batch enters review when all three are true:
 A destination store is eligible if it is within 10 km of the source store, OR it is a designated same-city hero store considered when no store within 10 km can absorb the excess.
 
 ## Section 3 — Destination Ranking
-Eligible destinations are ranked by projected SKU demand and ability to absorb the stock — never by distance alone. The nearest store is not automatically the recommended one.
+Eligible destinations are ranked by projected SKU demand and ability to absorb the stock — never by distance alone. Before recommending a destination, the agent must check that store's own existing on-hand inventory of the same SKU. A destination that already holds substantial inventory of the SKU relative to its own demand must be ranked below a destination with genuine unmet need (lower existing inventory relative to demand). The nearest store is not automatically the recommended one, and neither is the store with the highest raw demand if it is already well-stocked on that SKU.
 
 ## Section 4 — Shelf-Life-After-Arrival Rule
 A transfer must leave at least 24 hours of shelf life remaining after the batch arrives at the destination, accounting for transport time. If this cannot be met, the agent must not recommend the transfer.
@@ -40,5 +40,6 @@ Escalate instead of recommending a normal transfer when any of the following app
 - Quality status is damaged, temperature_breached, or unclear (see Section 7).
 - Recommended quantity would exceed the 30% source-stock cap (see Section 5).
 - Shelf life after arrival would fall below 24 hours (see Section 4).
+- Every eligible destination already holds sufficient inventory of the SKU relative to its own demand, leaving no destination with genuine unmet need (see Section 3).
 
 If a batch cannot be transferred and becomes waste, the agent must record the wastage reason, including whether the item was sold, returned, or quality-flagged, so downstream systems can learn whether the waste traces to a dependent process issue.

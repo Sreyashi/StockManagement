@@ -132,7 +132,7 @@ A batch enters review when all three are true:
 A destination store is eligible if it is within 10 km of the source store, OR it is a designated same-city hero store considered when no store within 10 km can absorb the excess.
 
 ## Section 3 — Destination Ranking
-Eligible destinations are ranked by projected SKU demand and ability to absorb the stock — never by distance alone. The nearest store is not automatically the recommended one.
+Eligible destinations are ranked by projected SKU demand and ability to absorb the stock — never by distance alone. Before recommending a destination, the agent must check that store's own existing on-hand inventory of the same SKU. A destination that already holds substantial inventory of the SKU relative to its own demand must be ranked below a destination with genuine unmet need (lower existing inventory relative to demand). The nearest store is not automatically the recommended one, and neither is the store with the highest raw demand if it is already well-stocked on that SKU.
 
 ## Section 4 — Shelf-Life-After-Arrival Rule
 A transfer must leave at least 24 hours of shelf life remaining after the batch arrives at the destination, accounting for transport time. If this cannot be met, the agent must not recommend the transfer.
@@ -160,12 +160,14 @@ Escalate instead of recommending a normal transfer when any of the following app
 - Quality status is damaged, temperature_breached, or unclear (see Section 7).
 - Recommended quantity would exceed the 30% source-stock cap (see Section 5).
 - Shelf life after arrival would fall below 24 hours (see Section 4).
+- Every eligible destination already holds sufficient inventory of the SKU relative to its own demand, leaving no destination with genuine unmet need (see Section 3).
 
 If a batch cannot be transferred and becomes waste, the agent must record the wastage reason, including whether the item was sold, returned, or quality-flagged, so downstream systems can learn whether the waste traces to a dependent process issue.
 `}
 ];
 
 const OUTPUT_FIELDS = [
+  { key: "status", label: "Status" },
   { key: "risk_summary", label: "Risk Summary" },
   { key: "source_store_and_batch", label: "Source Store And SKU/Batch" },
   { key: "units_at_risk", label: "Units At Risk" },
@@ -197,12 +199,15 @@ RULES - you must not:
 - Recommend a transfer unless at least 24 hours of shelf life is expected to remain after arrival.
 - Independently move stock, complete a physical transfer, approve questionable quality, or override escalation rules.
 - Create a transfer order without the warehouse manager first approving the destination store and transfer quantity. Only humans perform and confirm physical dispatch and receipt.
+- Recommend a destination store without checking that destination's existing on-hand inventory of the same SKU (given in each destination candidate's existing_inventory_units_of_same_sku field). A destination that already holds substantial inventory of the SKU relative to its own demand must not be recommended over a destination with genuine unmet need (lower existing inventory relative to demand), even if its raw demand number is higher.
 
 OUTPUT:
 Respond using exactly this line format, one field per line, in this exact order, with no extra commentary before or after and no blank lines between fields:
 ${OUTPUT_FORMAT_BLOCK}
 
-The Why line must name the exact data you used (batch ID, store IDs, forecast numbers) and the exact policy section you applied (for example "Section 4").
+The Status field must be exactly "OK" or "REFUSED-ESCALATE - <short reason citing the rule or policy section>". Use REFUSED-ESCALATE whenever any RULE above or ESCALATION trigger below applies (quality gate, low forecast confidence, missing or inconsistent data, no eligible destination, no destination with genuine unmet need, over-cap quantity, or insufficient shelf life after arrival). When Status is REFUSED-ESCALATE, still fill in every other field: use "N/A" for fields that do not apply (for example Recommended Destination Store or Recommended Transfer Quantity), but always state the real Units At Risk, Expiry Date, Manufactured Date, Previously Transferred, Returned From Customer Order, and Why from the actual data.
+
+The Why line must name the exact data you used (batch ID, store IDs, forecast numbers, existing inventory figures) and the exact policy section you applied (for example "Section 4" or "Section 7").
 
 ESCALATION:
 Stop and escalate, stating the reason, when confidence is low, data is missing, the request is out of policy, or stakes are high - specifically:
@@ -233,13 +238,41 @@ document.getElementById("save-key-btn").addEventListener("click", function() {
 
 updateKeyStatus();
 
-function buildCaseContext(batch) {
-  const forecasts = DEMAND_FORECAST.filter(function(f) { return f.batch_id === batch.batch_id; });
+function getDestinationCandidates(batch) {
   const distances = STORE_DISTANCES.filter(function(d) {
     return d.store_a_id === batch.store_id || d.store_b_id === batch.store_id;
   });
+  return distances.map(function(d) {
+    const otherId = d.store_a_id === batch.store_id ? d.store_b_id : d.store_a_id;
+    const otherName = d.store_a_id === batch.store_id ? d.store_b_name : d.store_a_name;
+    const forecast = DEMAND_FORECAST.find(function(f) {
+      return f.batch_id === batch.batch_id && f.store_id === otherId;
+    });
+    const existingInventory = BATCHES
+      .filter(function(b) { return b.store_id === otherId && b.sku_id === batch.sku_id; })
+      .reduce(function(sum, b) { return sum + b.on_hand_qty; }, 0);
+    return {
+      store_id: otherId,
+      store_name: otherName,
+      distance_km: d.distance_km,
+      transport_time_min: d.transport_time_min,
+      predicted_demand_units: forecast ? forecast.predicted_demand_units : null,
+      forecast_confidence: forecast ? forecast.forecast_confidence : null,
+      existing_inventory_units_of_same_sku: existingInventory
+    };
+  });
+}
+
+function buildCaseContext(batch) {
+  const forecasts = DEMAND_FORECAST.filter(function(f) { return f.batch_id === batch.batch_id; });
   const flags = QUALITY_FLAGS.filter(function(q) { return q.batch_id === batch.batch_id; });
-  return { batch: batch, linked_demand_forecast: forecasts, linked_store_distances: distances, linked_quality_flags: flags };
+  const destinationCandidates = getDestinationCandidates(batch);
+  return {
+    batch: batch,
+    linked_demand_forecast: forecasts,
+    destination_candidates: destinationCandidates,
+    linked_quality_flags: flags
+  };
 }
 
 function parseAgentOutput(text) {
@@ -272,9 +305,16 @@ function renderParsedOutput(container, text) {
     return;
   }
 
+  const statusP = document.createElement("p");
+  const statusLabel = document.createElement("strong");
+  statusLabel.textContent = "Status: ";
+  statusP.appendChild(statusLabel);
+  statusP.appendChild(document.createTextNode(parsed.fields.status));
+  container.appendChild(statusP);
+
   const dl = document.createElement("dl");
   OUTPUT_FIELDS.forEach(function(f) {
-    if (f.key === "why") return;
+    if (f.key === "why" || f.key === "status") return;
     const dt = document.createElement("dt");
     dt.textContent = f.label;
     const dd = document.createElement("dd");
