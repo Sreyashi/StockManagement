@@ -25,6 +25,9 @@
 
 <script>
 
+const MODEL = "claude-sonnet-4-5";
+const API_URL = "https://api.anthropic.com/v1/messages";
+
 const BATCHES = [
   {batch_id:"BAT-001", sku_id:"SKU02", sku_name:"Full Cream Milk 1L", store_id:"ST01", store_name:"Store A - Koramangala", manufactured_date:"2026-07-16T05:00", expiry_date:"2026-07-23T05:00", hours_to_expiry:44, on_hand_qty:120, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
   {batch_id:"BAT-002", sku_id:"SKU01", sku_name:"Toned Milk 500ml", store_id:"ST01", store_name:"Store A - Koramangala", manufactured_date:"2026-07-16T01:00", expiry_date:"2026-07-23T01:00", hours_to_expiry:40, on_hand_qty:150, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
@@ -207,6 +210,71 @@ document.getElementById("save-key-btn").addEventListener("click", function() {
 
 updateKeyStatus();
 
+function buildCaseContext(batch) {
+  const forecasts = DEMAND_FORECAST.filter(function(f) { return f.batch_id === batch.batch_id; });
+  const distances = STORE_DISTANCES.filter(function(d) {
+    return d.store_a_id === batch.store_id || d.store_b_id === batch.store_id;
+  });
+  const flags = QUALITY_FLAGS.filter(function(q) { return q.batch_id === batch.batch_id; });
+  return { batch: batch, linked_demand_forecast: forecasts, linked_store_distances: distances, linked_quality_flags: flags };
+}
+
+async function runCase(batch, outputEl) {
+  const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+  if (!apiKey) {
+    outputEl.textContent = "Error: no API key saved. Add your Anthropic API key in Settings above, then try again.";
+    return;
+  }
+
+  outputEl.textContent = "Running...";
+
+  const context = buildCaseContext(batch);
+  const userMessage = "Case:\n" + JSON.stringify(context, null, 2) +
+    "\n\nPolicy (policies/transfer_rules.md):\n" + POLICY_FILES[0].text;
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userMessage }]
+      })
+    });
+
+    if (!response.ok) {
+      let errText;
+      try {
+        const errJson = await response.json();
+        errText = (errJson.error && errJson.error.message) ? errJson.error.message : JSON.stringify(errJson);
+      } catch (parseErr) {
+        errText = await response.text();
+      }
+      if (response.status === 401) {
+        outputEl.textContent = "Error: the API key was rejected (401 unauthorized). Check the key in Settings.";
+      } else if (response.status === 429) {
+        outputEl.textContent = "Error: rate limited or out of credit (429). " + errText;
+      } else {
+        outputEl.textContent = "Error (" + response.status + "): " + errText;
+      }
+      return;
+    }
+
+    const data = await response.json();
+    const text = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : JSON.stringify(data);
+    outputEl.textContent = text;
+  } catch (err) {
+    outputEl.textContent = "Error: could not reach the API. Check your internet connection. (" + err.message + ")";
+  }
+}
+
 // Render: policy file names
 const policyList = document.getElementById("policy-list");
 POLICY_FILES.forEach(function(p) {
@@ -279,6 +347,19 @@ BATCHES.forEach(function(batch) {
     });
   }
   wrapper.appendChild(flagList);
+
+  const runBtn = document.createElement("button");
+  runBtn.type = "button";
+  runBtn.textContent = "Run";
+  wrapper.appendChild(runBtn);
+
+  const outputPre = document.createElement("pre");
+  outputPre.textContent = "(not run yet)";
+  wrapper.appendChild(outputPre);
+
+  runBtn.addEventListener("click", function() {
+    runCase(batch, outputPre);
+  });
 
   wrapper.appendChild(document.createElement("hr"));
   batchesDiv.appendChild(wrapper);
