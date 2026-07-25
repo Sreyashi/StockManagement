@@ -165,6 +165,26 @@ If a batch cannot be transferred and becomes waste, the agent must record the wa
 `}
 ];
 
+const OUTPUT_FIELDS = [
+  { key: "risk_summary", label: "Risk Summary" },
+  { key: "source_store_and_batch", label: "Source Store And SKU/Batch" },
+  { key: "units_at_risk", label: "Units At Risk" },
+  { key: "recommended_destination_store", label: "Recommended Destination Store" },
+  { key: "recommended_transfer_quantity", label: "Recommended Transfer Quantity" },
+  { key: "reason_for_recommendation", label: "Reason For Recommendation" },
+  { key: "forecast_confidence", label: "Forecast Confidence" },
+  { key: "distance_and_transport_time", label: "Distance And Transport Time" },
+  { key: "shelf_life_remaining_after_arrival", label: "Shelf Life Remaining After Arrival" },
+  { key: "expected_units_and_value_saved", label: "Expected Units Saved And Value Saved" },
+  { key: "expiry_date", label: "Expiry Date" },
+  { key: "manufactured_date", label: "Manufactured Date" },
+  { key: "previously_transferred", label: "Previously Transferred" },
+  { key: "returned_from_customer_order", label: "Returned From Customer Order" },
+  { key: "why", label: "Why" }
+];
+
+const OUTPUT_FORMAT_BLOCK = OUTPUT_FIELDS.map(function(f) { return f.label + ": ..."; }).join("\n");
+
 const SYSTEM_PROMPT = `ROLE:
 You are the Near-Expiry Inventory Transfer Agent for quick-commerce dark stores. Your role is to help warehouse managers reduce packaged fresh milk wastage by detecting near-expiry stock, validating demand forecasts, recommending safe inter-store transfers, and asking for human approval before creating any transfer order. V1 is transfer-only.
 
@@ -179,7 +199,10 @@ RULES - you must not:
 - Create a transfer order without the warehouse manager first approving the destination store and transfer quantity. Only humans perform and confirm physical dispatch and receipt.
 
 OUTPUT:
-Respond with exactly these labeled fields: Risk summary, Source store and SKU/batch, Units at risk, Recommended destination store, Recommended transfer quantity, Reason for recommendation, Forecast confidence, Distance and transport time, Shelf life remaining after arrival, Expected units saved and value saved, Expiry date, Manufactured date, Whether previously transferred, Whether returned from a customer order, Approval buttons (Approve transfer / Reject / Escalate).
+Respond using exactly this line format, one field per line, in this exact order, with no extra commentary before or after and no blank lines between fields:
+${OUTPUT_FORMAT_BLOCK}
+
+The Why line must name the exact data you used (batch ID, store IDs, forecast numbers) and the exact policy section you applied (for example "Section 4").
 
 ESCALATION:
 Stop and escalate, stating the reason, when confidence is low, data is missing, the request is out of policy, or stakes are high - specifically:
@@ -217,6 +240,56 @@ function buildCaseContext(batch) {
   });
   const flags = QUALITY_FLAGS.filter(function(q) { return q.batch_id === batch.batch_id; });
   return { batch: batch, linked_demand_forecast: forecasts, linked_store_distances: distances, linked_quality_flags: flags };
+}
+
+function parseAgentOutput(text) {
+  const fields = {};
+  let allFound = true;
+  OUTPUT_FIELDS.forEach(function(f) {
+    const escapedLabel = f.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp("^" + escapedLabel + ":\\s*(.*)$", "im");
+    const match = text.match(re);
+    if (match) {
+      fields[f.key] = match[1].trim();
+    } else {
+      allFound = false;
+    }
+  });
+  return { ok: allFound, fields: fields };
+}
+
+function renderParsedOutput(container, text) {
+  container.innerHTML = "";
+  const parsed = parseAgentOutput(text);
+
+  if (!parsed.ok) {
+    const notice = document.createElement("p");
+    notice.textContent = "agent output did not match format";
+    container.appendChild(notice);
+    const raw = document.createElement("pre");
+    raw.textContent = text;
+    container.appendChild(raw);
+    return;
+  }
+
+  const dl = document.createElement("dl");
+  OUTPUT_FIELDS.forEach(function(f) {
+    if (f.key === "why") return;
+    const dt = document.createElement("dt");
+    dt.textContent = f.label;
+    const dd = document.createElement("dd");
+    dd.textContent = parsed.fields[f.key];
+    dl.appendChild(dt);
+    dl.appendChild(dd);
+  });
+  container.appendChild(dl);
+
+  const whyP = document.createElement("p");
+  const whyLabel = document.createElement("strong");
+  whyLabel.textContent = "Why: ";
+  whyP.appendChild(whyLabel);
+  whyP.appendChild(document.createTextNode(parsed.fields.why));
+  container.appendChild(whyP);
 }
 
 async function runCase(batch, outputEl) {
@@ -269,7 +342,7 @@ async function runCase(batch, outputEl) {
 
     const data = await response.json();
     const text = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : JSON.stringify(data);
-    outputEl.textContent = text;
+    renderParsedOutput(outputEl, text);
   } catch (err) {
     outputEl.textContent = "Error: could not reach the API. Check your internet connection. (" + err.message + ")";
   }
@@ -353,12 +426,12 @@ BATCHES.forEach(function(batch) {
   runBtn.textContent = "Run";
   wrapper.appendChild(runBtn);
 
-  const outputPre = document.createElement("pre");
-  outputPre.textContent = "(not run yet)";
-  wrapper.appendChild(outputPre);
+  const outputDiv = document.createElement("div");
+  outputDiv.textContent = "(not run yet)";
+  wrapper.appendChild(outputDiv);
 
   runBtn.addEventListener("click", function() {
-    runCase(batch, outputPre);
+    runCase(batch, outputDiv);
   });
 
   wrapper.appendChild(document.createElement("hr"));
