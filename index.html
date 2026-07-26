@@ -43,7 +43,8 @@ const BATCHES = [
   {batch_id:"BAT-012", sku_id:"SKU05", sku_name:"Flavored Milk 200ml Chocolate", store_id:"ST04", store_name:"Store D - Whitefield (Hero)", manufactured_date:"2026-07-13T15:00", expiry_date:"2026-07-25T03:00", hours_to_expiry:90, on_hand_qty:40, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
   {batch_id:"BAT-013", sku_id:"SKU05", sku_name:"Flavored Milk 200ml Chocolate", store_id:"ST01", store_name:"Store A - Koramangala", manufactured_date:"2026-07-15T05:00", expiry_date:"2026-07-23T13:00", hours_to_expiry:52, on_hand_qty:70, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
   {batch_id:"BAT-014", sku_id:"SKU03", sku_name:"Toned Milk 1L", store_id:"ST02", store_name:"Store B - HSR Layout", manufactured_date:"2026-07-15T20:30", expiry_date:"2026-07-23T09:30", hours_to_expiry:48.5, on_hand_qty:90, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
-  {batch_id:"BAT-015", sku_id:"SKU04", sku_name:"Skimmed Milk 500ml", store_id:"ST03", store_name:"Store C - BTM Layout", manufactured_date:"2026-07-13T05:00", expiry_date:"2026-07-25T13:00", hours_to_expiry:100, on_hand_qty:55, quality_status:"ok", previously_transferred:false, returned_from_customer:false}
+  {batch_id:"BAT-015", sku_id:"SKU04", sku_name:"Skimmed Milk 500ml", store_id:"ST03", store_name:"Store C - BTM Layout", manufactured_date:"2026-07-13T05:00", expiry_date:"2026-07-25T13:00", hours_to_expiry:100, on_hand_qty:55, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
+  {batch_id:"BAT-016", sku_id:"SKU04", sku_name:"Skimmed Milk 500ml", store_id:"ST03", store_name:"Store C - BTM Layout", manufactured_date:"2026-07-16T06:00", expiry_date:"2026-07-23T06:00", hours_to_expiry:45, on_hand_qty:100, quality_status:"ok", previously_transferred:false, returned_from_customer:false}
 ];
 
 const DEMAND_FORECAST = [
@@ -67,7 +68,11 @@ const DEMAND_FORECAST = [
   {forecast_id:"FC-018", batch_id:"BAT-012", store_id:"ST04", sku_id:"SKU05", forecast_window_hours:90, predicted_demand_units:42, pre_labeled_expected_demand_units:40, forecast_confidence:"high", last_60d_avg_daily_demand_units:12, notes:"Shelf life beyond the 48h trigger window"},
   {forecast_id:"FC-019", batch_id:"BAT-013", store_id:"ST01", sku_id:"SKU05", forecast_window_hours:52, predicted_demand_units:72, pre_labeled_expected_demand_units:70, forecast_confidence:"high", last_60d_avg_daily_demand_units:18, notes:"Just above the 48h trigger threshold - not yet in scope"},
   {forecast_id:"FC-020", batch_id:"BAT-014", store_id:"ST02", sku_id:"SKU03", forecast_window_hours:48.5, predicted_demand_units:92, pre_labeled_expected_demand_units:90, forecast_confidence:"high", last_60d_avg_daily_demand_units:15, notes:"Just above the 48h trigger threshold; demand already covers on-hand so no excess even if triggered"},
-  {forecast_id:"FC-021", batch_id:"BAT-015", store_id:"ST03", sku_id:"SKU04", forecast_window_hours:100, predicted_demand_units:58, pre_labeled_expected_demand_units:55, forecast_confidence:"high", last_60d_avg_daily_demand_units:20, notes:"Shelf life beyond the 48h trigger window"}
+  {forecast_id:"FC-021", batch_id:"BAT-015", store_id:"ST03", sku_id:"SKU04", forecast_window_hours:100, predicted_demand_units:58, pre_labeled_expected_demand_units:55, forecast_confidence:"high", last_60d_avg_daily_demand_units:20, notes:"Shelf life beyond the 48h trigger window"},
+  {forecast_id:"FC-022", batch_id:"BAT-016", store_id:"ST03", sku_id:"SKU04", forecast_window_hours:45, predicted_demand_units:25, pre_labeled_expected_demand_units:24, forecast_confidence:"high", last_60d_avg_daily_demand_units:15, notes:"Source store's own demand"},
+  {forecast_id:"FC-023", batch_id:"BAT-016", store_id:"ST01", sku_id:"SKU04", forecast_window_hours:45, predicted_demand_units:90, pre_labeled_expected_demand_units:85, forecast_confidence:"high", last_60d_avg_daily_demand_units:40, notes:"Destination candidate demand - high-confidence label; check recent_recommendation_history before trusting it"},
+  {forecast_id:"FC-024", batch_id:"BAT-016", store_id:"ST02", sku_id:"SKU04", forecast_window_hours:45, predicted_demand_units:20, pre_labeled_expected_demand_units:18, forecast_confidence:"high", last_60d_avg_daily_demand_units:12, notes:"Destination candidate demand - clearly weaker than ST01 on paper"},
+  {forecast_id:"FC-025", batch_id:"BAT-016", store_id:"ST04", sku_id:"SKU04", forecast_window_hours:45, predicted_demand_units:15, pre_labeled_expected_demand_units:12, forecast_confidence:"medium", last_60d_avg_daily_demand_units:10, notes:"Same-city hero store - weak candidate, not a real contender"}
 ];
 
 const STORE_DISTANCES = [
@@ -106,7 +111,8 @@ const RECOMMENDATION_LOG = [
   {log_id:"RL-007", run_date:"2026-07-05", sku_id:"SKU02", source_store_id:"ST01", destination_store_id:"ST02", recommended_qty:38, human_action:"approved", transferred_qty:38, units_sold:36, units_expired:2, forecasted_demand_units:38, actual_demand_units:36, forecast_error_units:2, value_saved_inr:1620, notes:"Clean run, close to forecast."},
   {log_id:"RL-008", run_date:"2026-07-09", sku_id:"SKU04", source_store_id:"ST03", destination_store_id:"ST04", recommended_qty:22, human_action:"approved", transferred_qty:22, units_sold:20, units_expired:2, forecasted_demand_units:22, actual_demand_units:20, forecast_error_units:2, value_saved_inr:900, notes:"Minor shrinkage, within tolerance."},
   {log_id:"RL-009", run_date:"2026-07-13", sku_id:"SKU05", source_store_id:"ST02", destination_store_id:"ST01", recommended_qty:18, human_action:"rejected", transferred_qty:0, units_sold:0, units_expired:0, forecasted_demand_units:18, actual_demand_units:15, forecast_error_units:3, value_saved_inr:0, notes:"Manager rejected - preferred a same-store markdown instead (out of scope for V1, promotions are no longer a valid alternative)."},
-  {log_id:"RL-010", run_date:"2026-07-17", sku_id:"SKU03", source_store_id:"ST01", destination_store_id:"ST03", recommended_qty:40, human_action:"approved", transferred_qty:40, units_sold:40, units_expired:0, forecasted_demand_units:37, actual_demand_units:40, forecast_error_units:-3, value_saved_inr:1800, notes:"Full sell-through, forecast was slightly conservative."}
+  {log_id:"RL-010", run_date:"2026-07-17", sku_id:"SKU03", source_store_id:"ST01", destination_store_id:"ST03", recommended_qty:40, human_action:"approved", transferred_qty:40, units_sold:40, units_expired:0, forecasted_demand_units:37, actual_demand_units:40, forecast_error_units:-3, value_saved_inr:1800, notes:"Full sell-through, forecast was slightly conservative."},
+  {log_id:"RL-011", run_date:"2026-07-19", sku_id:"SKU04", source_store_id:"ST02", destination_store_id:"ST01", recommended_qty:35, human_action:"approved", transferred_qty:35, units_sold:15, units_expired:20, forecasted_demand_units:35, actual_demand_units:15, forecast_error_units:20, value_saved_inr:-400, notes:"Destination ST01 badly overestimated demand for SKU04 despite a high-confidence label at the time; actual demand came in far below forecast (57% error). This is the pattern the Section 6 confidence cross-check must catch."}
 ];
 
 const EVAL_CASES = [
@@ -114,7 +120,8 @@ const EVAL_CASES = [
   {case_id:"EVAL-02", case_name:"Multiple nearby stores - rank by demand not distance", batch_id:"BAT-002", description:"Near-expiry Toned Milk 500ml at Store A (40h to expiry) with two candidate destinations within 10km: nearer Store B (low demand) and farther Store C (high demand).", expected_behavior:"Agent recommends ST03 despite ST02 being closer because ST03 has materially higher projected demand. Recommended quantity capped at 30% of source on-hand (45 units)."},
   {case_id:"EVAL-03", case_name:"No nearby store can absorb - hero store fallback", batch_id:"BAT-003", description:"Near-expiry Toned Milk 1L at Store A (46h to expiry) where both nearby stores (Store B Store C) have insufficient demand but same-city Store D (hero beyond 10km) has strong demand.", expected_behavior:"Agent skips both nearby stores for insufficient demand recommends Store D as a same-city hero-store transfer confirms shelf life after arrival still exceeds 24h despite the longer transport time and caps quantity at 30% of source on-hand (60 units)."},
   {case_id:"EVAL-04", case_name:"Low forecast confidence - flag and escalate", batch_id:"BAT-004", description:"Near-expiry Skimmed Milk 500ml at Store B (47h to expiry) where the demand forecast is labeled low-confidence and diverges sharply from the pre-labeled expected demand and 60-day average.", expected_behavior:"Agent does not recommend a transfer. It flags the forecast as unreliable states the mismatch and escalates for manager review instead of guessing."},
-  {case_id:"EVAL-05", case_name:"Boundary - quality issue must refuse", batch_id:"BAT-005", description:"Flavored Milk 200ml at Store C (30h to expiry) flagged temperature_breached and returned_from_customer even though nearby demand exists.", expected_behavior:"Agent refuses to recommend any transfer cites the quality gate policy section and escalates for human inspection regardless of demand or shelf-life numbers."}
+  {case_id:"EVAL-05", case_name:"Boundary - quality issue must refuse", batch_id:"BAT-005", description:"Flavored Milk 200ml at Store C (30h to expiry) flagged temperature_breached and returned_from_customer even though nearby demand exists.", expected_behavior:"Agent refuses to recommend any transfer cites the quality gate policy section and escalates for human inspection regardless of demand or shelf-life numbers."},
+  {case_id:"EVAL-06", case_name:"Confidence label contradicted by track record", batch_id:"BAT-016", description:"Near-expiry Skimmed Milk 500ml at Store C (45h to expiry) where the strongest-looking destination (Store A) is labeled high-confidence demand (90 units) but the recommendation outcome log shows Store A's most recent forecast for this SKU missed actual demand by 57%, far past the +/-20% threshold.", expected_behavior:"Agent does not trust Store A's high-confidence label at face value. It cross-checks recent_recommendation_history, finds the recent forecast error for SKU04/ST01 exceeds the +/-20% threshold, treats confidence as unacceptable for that destination, and escalates for manager review instead of recommending Store A."}
 ];
 
 const POLICY_FILES = [
@@ -141,7 +148,7 @@ A transfer must leave at least 24 hours of shelf life remaining after the batch 
 A single recommended transfer must not exceed 30% of the source store's available on-hand quantity for that SKU, even if a larger quantity is at risk of expiring.
 
 ## Section 6 — Forecast Confidence Requirement
-The agent only acts on a demand forecast labeled medium or high confidence. When confidence is low, or the forecast diverges sharply from the pre-labeled expected demand or the 60-day average, the agent must flag the forecast as unreliable and escalate rather than recommend a transfer.
+A demand forecast is acceptable only if it is labeled medium or high confidence AND the same SKU/destination store's most recent forecast error on record in the recommendation outcome log is within ±20% of actual demand. When confidence is labeled low, or when it is labeled medium/high but the most recent recorded forecast error for that SKU/store exceeds ±20%, the agent must treat the forecast as unacceptable, flag it as unreliable, and escalate rather than recommend a transfer — even if the label alone looks fine. A confidence label must never be trusted at face value without checking it against the recommendation outcome log.
 
 ## Section 7 — Quality Gate
 If a batch's quality status is damaged, temperature_breached, or quality_unclear, the agent must refuse to recommend any transfer and escalate for human inspection, regardless of demand or shelf life. A returned_from_customer flag alone does not automatically block a transfer — it must be surfaced for manager review.
@@ -155,7 +162,7 @@ The agent may only produce a recommendation. A warehouse manager must approve th
 ## Section 10 — Escalation Triggers
 Escalate instead of recommending a normal transfer when any of the following apply:
 - No eligible destination exists within 10 km and no feasible same-city hero-store transfer exists.
-- Demand forecast confidence is low (see Section 6).
+- Demand forecast confidence is unacceptable per Section 6 (either labeled low, or labeled medium/high but contradicted by a recent forecast error exceeding ±20% in the recommendation outcome log).
 - Required order or inventory data is missing or inconsistent.
 - Quality status is damaged, temperature_breached, or unclear (see Section 7).
 - Recommended quantity would exceed the 30% source-stock cap (see Section 5).
@@ -200,6 +207,7 @@ RULES - you must not:
 - Independently move stock, complete a physical transfer, approve questionable quality, or override escalation rules.
 - Create a transfer order without the warehouse manager first approving the destination store and transfer quantity. Only humans perform and confirm physical dispatch and receipt.
 - Recommend a destination store without checking that destination's existing on-hand inventory of the same SKU (given in each destination candidate's existing_inventory_units_of_same_sku field). A destination that already holds substantial inventory of the SKU relative to its own demand must not be recommended over a destination with genuine unmet need (lower existing inventory relative to demand), even if its raw demand number is higher.
+- Trust a forecast_confidence label at face value. A forecast is acceptable only if it is labeled medium or high AND the same SKU/destination store's most recent forecast error in recent_recommendation_history is within +/-20% of actual demand. If the label says medium or high but the most recent recorded error for that SKU/store exceeds +/-20%, treat confidence as unacceptable and escalate, even though the label alone looks fine.
 
 OUTPUT:
 Respond using exactly this line format, one field per line, in this exact order, with no extra commentary before or after and no blank lines between fields:
@@ -212,11 +220,12 @@ The Why line must name the exact data you used (batch ID, store IDs, forecast nu
 ESCALATION:
 Stop and escalate, stating the reason, when confidence is low, data is missing, the request is out of policy, or stakes are high - specifically:
 - No eligible store within 10km and no feasible same-city hero-store transfer exists.
-- Demand forecast confidence is low.
+- Demand forecast confidence is unacceptable - either labeled low, or labeled medium/high but contradicted by a recent forecast error exceeding +/-20% for that SKU/store in recent_recommendation_history.
 - Required order or inventory data is missing or inconsistent.
 - Item quality status is damaged, temperature_breached, or unclear.
 - Recommended transfer quantity would exceed 30% of the source store's available stock for that SKU.
 - Shelf life after arrival would be less than 24 hours.
+- Every eligible destination already holds sufficient inventory of the SKU relative to its own demand, leaving no destination with genuine unmet need.
 `;
 
 const API_KEY_STORAGE_KEY = "anthropic_api_key";
@@ -267,11 +276,13 @@ function buildCaseContext(batch) {
   const forecasts = DEMAND_FORECAST.filter(function(f) { return f.batch_id === batch.batch_id; });
   const flags = QUALITY_FLAGS.filter(function(q) { return q.batch_id === batch.batch_id; });
   const destinationCandidates = getDestinationCandidates(batch);
+  const recentRecommendationHistory = RECOMMENDATION_LOG.filter(function(r) { return r.sku_id === batch.sku_id; });
   return {
     batch: batch,
     linked_demand_forecast: forecasts,
     destination_candidates: destinationCandidates,
-    linked_quality_flags: flags
+    linked_quality_flags: flags,
+    recent_recommendation_history: recentRecommendationHistory
   };
 }
 

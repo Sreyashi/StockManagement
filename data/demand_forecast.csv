@@ -20,3 +20,7 @@ FC-018,BAT-012,ST04,SKU05,90,42,40,high,12,Shelf life beyond the 48h trigger win
 FC-019,BAT-013,ST01,SKU05,52,72,70,high,18,Just above the 48h trigger threshold - not yet in scope
 FC-020,BAT-014,ST02,SKU03,48.5,92,90,high,15,Just above the 48h trigger threshold; demand already covers on-hand so no excess even if triggered
 FC-021,BAT-015,ST03,SKU04,100,58,55,high,20,Shelf life beyond the 48h trigger window
+FC-022,BAT-016,ST03,SKU04,45,25,24,high,15,Source store's own demand
+FC-023,BAT-016,ST01,SKU04,45,90,85,high,40,Destination candidate demand - high-confidence label; check recent_recommendation_history before trusting it
+FC-024,BAT-016,ST02,SKU04,45,20,18,high,12,Destination candidate demand - clearly weaker than ST01 on paper
+FC-025,BAT-016,ST04,SKU04,45,15,12,medium,10,Same-city hero store - weak candidate, not a real contender
