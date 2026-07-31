@@ -23,6 +23,14 @@
 <h2>Batches</h2>
 <div id="batches"></div>
 
+<h2>Run Log</h2>
+<table id="run-log-table">
+  <thead>
+    <tr><th>Time</th><th>Case</th><th>Agent Decision</th><th>Human Action</th></tr>
+  </thead>
+  <tbody id="run-log-body"></tbody>
+</table>
+
 <script>
 
 const MODEL = "claude-sonnet-4-5";
@@ -302,7 +310,120 @@ function parseAgentOutput(text) {
   return { ok: allFound, fields: fields };
 }
 
-function renderParsedOutput(container, text) {
+const RUN_LOG = [];
+
+function appendRunLogEntry(batch, parsedFields, humanAction) {
+  RUN_LOG.push({
+    time: new Date().toLocaleString(),
+    case: batch.batch_id + " (" + batch.sku_name + " @ " + batch.store_name + ")",
+    agent_decision: parsedFields.status + " - " + parsedFields.risk_summary,
+    human_action: humanAction
+  });
+  renderRunLog();
+}
+
+function renderRunLog() {
+  const tbody = document.getElementById("run-log-body");
+  tbody.innerHTML = "";
+  RUN_LOG.forEach(function(entry) {
+    const tr = document.createElement("tr");
+    ["time", "case", "agent_decision", "human_action"].forEach(function(key) {
+      const td = document.createElement("td");
+      td.textContent = entry[key];
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+function addReviewGate(container, batch, parsedFields) {
+  const gateDiv = document.createElement("div");
+
+  const approveBtn = document.createElement("button");
+  approveBtn.type = "button";
+  approveBtn.textContent = "Approve";
+
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.textContent = "Edit";
+
+  const escalateBtn = document.createElement("button");
+  escalateBtn.type = "button";
+  escalateBtn.textContent = "Escalate";
+
+  const statusText = document.createElement("span");
+
+  gateDiv.appendChild(approveBtn);
+  gateDiv.appendChild(editBtn);
+  gateDiv.appendChild(escalateBtn);
+  gateDiv.appendChild(statusText);
+  container.appendChild(gateDiv);
+
+  function lockGate(label) {
+    approveBtn.disabled = true;
+    editBtn.disabled = true;
+    escalateBtn.disabled = true;
+    statusText.textContent = label;
+  }
+
+  approveBtn.addEventListener("click", function() {
+    appendRunLogEntry(batch, parsedFields, "Approved");
+    lockGate("Approved.");
+  });
+
+  editBtn.addEventListener("click", function() {
+    approveBtn.disabled = true;
+    editBtn.disabled = true;
+    escalateBtn.disabled = true;
+
+    const editArea = document.createElement("textarea");
+    editArea.rows = 8;
+    editArea.cols = 60;
+    editArea.value = OUTPUT_FIELDS.map(function(f) { return f.label + ": " + parsedFields[f.key]; }).join("\n");
+
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.textContent = "Save";
+
+    gateDiv.appendChild(editArea);
+    gateDiv.appendChild(saveBtn);
+
+    saveBtn.addEventListener("click", function() {
+      const firstLine = editArea.value.split("\n")[0];
+      appendRunLogEntry(batch, parsedFields, "Edited: " + firstLine);
+      editArea.remove();
+      saveBtn.remove();
+      lockGate("Edited and saved.");
+    });
+  });
+
+  escalateBtn.addEventListener("click", function() {
+    approveBtn.disabled = true;
+    editBtn.disabled = true;
+    escalateBtn.disabled = true;
+
+    const reasonInput = document.createElement("input");
+    reasonInput.type = "text";
+    reasonInput.placeholder = "One-line escalation reason";
+
+    const confirmBtn = document.createElement("button");
+    confirmBtn.type = "button";
+    confirmBtn.textContent = "Confirm escalation";
+
+    gateDiv.appendChild(reasonInput);
+    gateDiv.appendChild(confirmBtn);
+
+    confirmBtn.addEventListener("click", function() {
+      const reason = reasonInput.value.trim() || "(no reason given)";
+      appendRunLogEntry(batch, parsedFields, "Escalated: " + reason);
+      reasonInput.remove();
+      confirmBtn.remove();
+      lockGate("Escalated.");
+    });
+  });
+}
+
+function renderParsedOutput(container, text, batch) {
   container.innerHTML = "";
   const parsed = parseAgentOutput(text);
 
@@ -341,6 +462,8 @@ function renderParsedOutput(container, text) {
   whyP.appendChild(whyLabel);
   whyP.appendChild(document.createTextNode(parsed.fields.why));
   container.appendChild(whyP);
+
+  addReviewGate(container, batch, parsed.fields);
 }
 
 async function runCase(batch, outputEl) {
@@ -393,7 +516,7 @@ async function runCase(batch, outputEl) {
 
     const data = await response.json();
     const text = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : JSON.stringify(data);
-    renderParsedOutput(outputEl, text);
+    renderParsedOutput(outputEl, text, batch);
   } catch (err) {
     outputEl.textContent = "Error: could not reach the API. Check your internet connection. (" + err.message + ")";
   }
