@@ -420,7 +420,7 @@ A batch enters review when all three are true:
 3. The resulting projected unsold quantity is greater than zero.
 
 ## Section 2 — Destination Eligibility
-A destination store is eligible if it is within 10 km of the source store, OR it is a designated same-city hero store considered when no store within 10 km can absorb the excess.
+A destination store is eligible if it is within 10 km of the source store, or if it is a designated same-city hero store. Same-city hero stores are always included in the comparison alongside within-10km stores — they are not held back until every within-10km store has zero or negative unmet need. Section 3 decides the winner by ranking all eligible destinations, nearby and hero alike, by unmet_need_units; a hero store with substantially higher unmet_need_units than any within-10km option must be preferred over a nearby store whose unmet need is only marginal.
 
 ## Section 3 — Destination Ranking
 For every eligible destination, compute unmet need: unmet_need = predicted demand − existing on-hand inventory of the same SKU. Eligible destinations are ranked by unmet_need, highest first — never by distance alone, and never by which destination simply has the lowest existing inventory in isolation. A destination that already holds some inventory of the SKU can still have more genuine unmet need than a destination starting at zero, if its demand is high enough; the comparison that matters is the net figure (demand minus existing inventory), not the existing-inventory number by itself. The nearest store is not automatically the recommended one, and neither is the store with the highest raw demand if it is already well-stocked on that SKU relative to demand.
