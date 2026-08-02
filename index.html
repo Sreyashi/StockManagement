@@ -423,7 +423,7 @@ A batch enters review when all three are true:
 A destination store is eligible if it is within 10 km of the source store, OR it is a designated same-city hero store considered when no store within 10 km can absorb the excess.
 
 ## Section 3 — Destination Ranking
-Eligible destinations are ranked by projected SKU demand and ability to absorb the stock — never by distance alone. Before recommending a destination, the agent must check that store's own existing on-hand inventory of the same SKU. A destination that already holds substantial inventory of the SKU relative to its own demand must be ranked below a destination with genuine unmet need (lower existing inventory relative to demand). The nearest store is not automatically the recommended one, and neither is the store with the highest raw demand if it is already well-stocked on that SKU.
+For every eligible destination, compute unmet need: unmet_need = predicted demand − existing on-hand inventory of the same SKU. Eligible destinations are ranked by unmet_need, highest first — never by distance alone, and never by which destination simply has the lowest existing inventory in isolation. A destination that already holds some inventory of the SKU can still have more genuine unmet need than a destination starting at zero, if its demand is high enough; the comparison that matters is the net figure (demand minus existing inventory), not the existing-inventory number by itself. The nearest store is not automatically the recommended one, and neither is the store with the highest raw demand if it is already well-stocked on that SKU relative to demand.
 
 ## Section 4 — Shelf-Life-After-Arrival Rule
 A transfer must leave at least 24 hours of shelf life remaining after the batch arrives at the destination, accounting for transport time. If this cannot be met, the agent must not recommend the transfer.
@@ -491,7 +491,7 @@ RULES - you must not:
 - Recommend a transfer unless at least 24 hours of shelf life is expected to remain after arrival.
 - Independently move stock, complete a physical transfer, approve questionable quality, or override escalation rules.
 - Create a transfer order without the warehouse manager first approving the destination store and transfer quantity. Only humans perform and confirm physical dispatch and receipt.
-- Recommend a destination store without checking that destination's existing on-hand inventory of the same SKU (given in each destination candidate's existing_inventory_units_of_same_sku field). A destination that already holds substantial inventory of the SKU relative to its own demand must not be recommended over a destination with genuine unmet need (lower existing inventory relative to demand), even if its raw demand number is higher.
+- Recommend a destination store without checking its unmet_need_units field (already computed for you as predicted_demand_units minus existing_inventory_units_of_same_sku for every eligible candidate). Rank eligible destinations by unmet_need_units, highest first, and recommend the one with the greatest unmet_need_units - not simply the one with the lowest existing_inventory_units_of_same_sku in isolation. A candidate with some existing inventory can still have a higher unmet_need_units value than one starting at zero, if its demand is high enough.
 - Trust a forecast_confidence label at face value. A forecast is acceptable only if it is labeled medium or high AND the same SKU/destination store's most recent forecast error in recent_recommendation_history is within +/-20% of actual demand. If the label says medium or high but the most recent recorded error for that SKU/store exceeds +/-20%, treat confidence as unacceptable and escalate, even though the label alone looks fine.
 - Cite a policy section number or record ID (batch, forecast, store, quality-flag, or log ID) in the Citations field that does not actually appear in the provided context. If a case is missing data you would need to cite, ask for it or escalate instead of inventing a citation or a fact.
 
@@ -548,14 +548,16 @@ function getDestinationCandidates(batch) {
     const existingInventory = BATCHES
       .filter(function(b) { return b.store_id === otherId && b.sku_id === batch.sku_id; })
       .reduce(function(sum, b) { return sum + b.on_hand_qty; }, 0);
+    const predictedDemand = forecast ? forecast.predicted_demand_units : null;
     return {
       store_id: otherId,
       store_name: otherName,
       distance_km: d.distance_km,
       transport_time_min: d.transport_time_min,
-      predicted_demand_units: forecast ? forecast.predicted_demand_units : null,
+      predicted_demand_units: predictedDemand,
       forecast_confidence: forecast ? forecast.forecast_confidence : null,
-      existing_inventory_units_of_same_sku: existingInventory
+      existing_inventory_units_of_same_sku: existingInventory,
+      unmet_need_units: (predictedDemand === null) ? null : (predictedDemand - existingInventory)
     };
   });
 }
