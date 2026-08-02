@@ -247,7 +247,7 @@ body {
 }
 
 /* ═══ EXTENSIONS — form elements the kit doesn't style, built from the same tokens only ═══ */
-input[type="text"], input[type="password"], textarea {
+input[type="text"], input[type="password"], textarea, select {
   background: var(--bg-inset); color: var(--ink); border: var(--border-w) solid var(--line);
   border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-3);
   font-family: var(--font-body); font-size: var(--fs-1);
@@ -255,6 +255,7 @@ input[type="text"], input[type="password"], textarea {
 h1, h2, h3 { font-family: var(--font-body); color: var(--ink); }
 ul, ol { padding-left: var(--sp-5); }
 p { margin: var(--sp-2) 0; }
+.evals-wrap { margin: 0 var(--sp-4) var(--sp-4); }
 </style>
 </head>
 <body>
@@ -291,6 +292,18 @@ p { margin: var(--sp-2) 0; }
     </div>
   </div>
 
+</div>
+
+<div class="panel evals-wrap">
+  <div class="panel-head">Evals</div>
+  <div class="panel-body">
+    <table class="evals-table">
+      <thead>
+        <tr><th>Case</th><th>Expected Behavior</th><th>Actual</th><th>Verdict</th></tr>
+      </thead>
+      <tbody id="evals-tbody"></tbody>
+    </table>
+  </div>
 </div>
 
 <script>
@@ -641,6 +654,77 @@ function renderDemoChips() {
     chip.textContent = ec.case_name;
     chip.addEventListener("click", function() { selectCase(ec.batch_id); });
     container.appendChild(chip);
+  });
+}
+
+/* ═══ EVALS VIEW ═══ */
+const EVAL_RESULTS = {};
+EVAL_CASES.forEach(function(ec) { EVAL_RESULTS[ec.case_id] = { actual: "", verdict: "" }; });
+
+function summarizeCaseState(state) {
+  if (!state || state.status === "not_run") return "(not run yet)";
+  if (state.status === "running") return "Running...";
+  if (state.status === "error") return state.message;
+  if (!state.parsed.ok) return "agent output did not match format";
+  return state.parsed.fields.status + " — " + state.parsed.fields.why;
+}
+
+async function runEvalCase(ec) {
+  const batch = getBatchById(ec.batch_id);
+  const actualCell = document.getElementById("eval-actual-" + ec.case_id);
+  actualCell.textContent = "Running...";
+  await runCase(batch);
+  const summary = summarizeCaseState(CASE_STATE[batch.batch_id]);
+  EVAL_RESULTS[ec.case_id].actual = summary;
+  actualCell.textContent = summary;
+}
+
+function renderEvalsTable() {
+  const tbody = document.getElementById("evals-tbody");
+  tbody.innerHTML = "";
+
+  EVAL_CASES.forEach(function(ec) {
+    const tr = document.createElement("tr");
+
+    const caseTd = document.createElement("td");
+    const nameEl = document.createElement("div");
+    const nameStrong = document.createElement("strong");
+    nameStrong.textContent = ec.case_name;
+    nameEl.appendChild(nameStrong);
+    const idEl = document.createElement("div");
+    idEl.textContent = ec.batch_id;
+    const runBtn = makeBtn("Run");
+    runBtn.addEventListener("click", function() { runEvalCase(ec); });
+    caseTd.appendChild(nameEl);
+    caseTd.appendChild(idEl);
+    caseTd.appendChild(runBtn);
+    tr.appendChild(caseTd);
+
+    const expectedTd = document.createElement("td");
+    expectedTd.textContent = ec.expected_behavior;
+    tr.appendChild(expectedTd);
+
+    const actualTd = document.createElement("td");
+    actualTd.id = "eval-actual-" + ec.case_id;
+    actualTd.textContent = EVAL_RESULTS[ec.case_id].actual || "—";
+    tr.appendChild(actualTd);
+
+    const verdictTd = document.createElement("td");
+    const select = document.createElement("select");
+    [["", "—"], ["pass", "Pass"], ["needs_work", "Needs work"], ["fail", "Fail"]].forEach(function(opt) {
+      const optionEl = document.createElement("option");
+      optionEl.value = opt[0];
+      optionEl.textContent = opt[1];
+      select.appendChild(optionEl);
+    });
+    select.value = EVAL_RESULTS[ec.case_id].verdict;
+    select.addEventListener("change", function() {
+      EVAL_RESULTS[ec.case_id].verdict = select.value;
+    });
+    verdictTd.appendChild(select);
+    tr.appendChild(verdictTd);
+
+    tbody.appendChild(tr);
   });
 }
 
@@ -1121,6 +1205,7 @@ renderDemoChips();
 renderCaseList();
 renderMainPanel();
 renderRunLog();
+renderEvalsTable();
 
 </script>
 </body>
