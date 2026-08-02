@@ -518,6 +518,7 @@ document.getElementById("save-key-btn").addEventListener("click", function() {
     input.value = "";
   }
   updateTopbarMeta();
+  renderMainPanel();
 });
 
 function getDestinationCandidates(batch) {
@@ -606,6 +607,15 @@ function appendRunLogEntry(batch, parsedFields, humanActionText, actionType) {
 function renderRunLog() {
   const logEl = document.getElementById("run-log");
   logEl.innerHTML = "";
+
+  if (RUN_LOG.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "row";
+    empty.textContent = "No runs yet. Approve, edit, or escalate a case to start the log.";
+    logEl.appendChild(empty);
+    return;
+  }
+
   RUN_LOG.forEach(function(entry) {
     const row = document.createElement("div");
     row.className = "row";
@@ -786,8 +796,23 @@ function addReviewGate(container, batch, state) {
 /* ═══ STAGE 3 — DECISION: what the agent chose and why ═══ */
 function renderStage3Decision(container, state) {
   if (state.status === "not_run") { container.textContent = "(not run yet)"; return; }
-  if (state.status === "running") { container.textContent = "Running..."; return; }
-  if (state.status === "error") { container.textContent = state.message; return; }
+
+  if (state.status === "running") {
+    const thinking = document.createElement("span");
+    thinking.className = "thinking";
+    thinking.textContent = "Running";
+    container.appendChild(thinking);
+    return;
+  }
+
+  if (state.status === "error") {
+    const errNote = document.createElement("div");
+    errNote.className = "error-note";
+    errNote.textContent = state.message;
+    container.appendChild(errNote);
+    return;
+  }
+
   if (!state.parsed.ok) { container.textContent = "agent output did not match format"; return; }
 
   const badge = document.createElement("span");
@@ -860,13 +885,26 @@ function renderMainPanel() {
   if (!SELECTED_BATCH_ID) {
     const empty = document.createElement("div");
     empty.className = "empty";
+
     const headline = document.createElement("div");
     headline.className = "headline";
-    headline.textContent = "Select a case";
-    const p = document.createElement("p");
-    p.textContent = "Click a case in the list to see its full detail.";
+    headline.textContent = "Near-Expiry Inventory Transfer Agent";
     empty.appendChild(headline);
-    empty.appendChild(p);
+
+    const oneLiner = document.createElement("p");
+    oneLiner.textContent = "Finds packaged milk at risk of expiring, recommends a safe store-to-store transfer, and waits for your approval before anything moves.";
+    empty.appendChild(oneLiner);
+
+    if (!localStorage.getItem(API_KEY_STORAGE_KEY)) {
+      const keyNote = document.createElement("p");
+      keyNote.innerHTML = "<strong>No API key saved yet.</strong> Add your Anthropic API key in Settings, top right of the page, to run a case.";
+      empty.appendChild(keyNote);
+    }
+
+    const hint = document.createElement("p");
+    hint.textContent = "Click a case on the left, or one of the demo chips above the list, to see the full loop.";
+    empty.appendChild(hint);
+
     body.appendChild(empty);
     return;
   }
@@ -1082,6 +1120,7 @@ updateTopbarMeta();
 renderDemoChips();
 renderCaseList();
 renderMainPanel();
+renderRunLog();
 
 </script>
 </body>
