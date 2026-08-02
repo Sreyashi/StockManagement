@@ -21,6 +21,11 @@
 <ul id="policy-list"></ul>
 
 <h2>Batches</h2>
+<div>
+  <button type="button" id="run-all-btn">Run All</button>
+  <span id="run-all-progress"></span>
+  <p id="run-all-summary"></p>
+</div>
 <div id="batches"></div>
 
 <h2>Run Log</h2>
@@ -438,7 +443,7 @@ function renderParsedOutput(container, text, batch) {
     const raw = document.createElement("pre");
     raw.textContent = text;
     container.appendChild(raw);
-    return;
+    return parsed;
   }
 
   const statusP = document.createElement("p");
@@ -485,13 +490,14 @@ function renderParsedOutput(container, text, batch) {
   container.appendChild(citationsP);
 
   addReviewGate(container, batch, parsed.fields);
+  return parsed;
 }
 
 async function runCase(batch, outputEl) {
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
   if (!apiKey) {
     outputEl.textContent = "Error: no API key saved. Add your Anthropic API key in Settings above, then try again.";
-    return;
+    return "error";
   }
 
   outputEl.textContent = "Running...";
@@ -532,14 +538,17 @@ async function runCase(batch, outputEl) {
       } else {
         outputEl.textContent = "Error (" + response.status + "): " + errText;
       }
-      return;
+      return "error";
     }
 
     const data = await response.json();
     const text = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : JSON.stringify(data);
-    renderParsedOutput(outputEl, text, batch);
+    const parsed = renderParsedOutput(outputEl, text, batch);
+    if (!parsed.ok) return "malformed";
+    return parsed.fields.status.indexOf("REFUSED-ESCALATE") === 0 ? "refused" : "ok";
   } catch (err) {
     outputEl.textContent = "Error: could not reach the API. Check your internet connection. (" + err.message + ")";
+    return "error";
   }
 }
 
@@ -553,6 +562,7 @@ POLICY_FILES.forEach(function(p) {
 
 // Render: batches with linked forecast, distance, and quality-flag records
 const batchesDiv = document.getElementById("batches");
+const RUN_TARGETS = [];
 BATCHES.forEach(function(batch) {
   const wrapper = document.createElement("div");
 
@@ -629,9 +639,37 @@ BATCHES.forEach(function(batch) {
     runCase(batch, outputDiv);
   });
 
+  RUN_TARGETS.push({ batch: batch, outputEl: outputDiv });
+
   wrapper.appendChild(document.createElement("hr"));
   batchesDiv.appendChild(wrapper);
 });
+
+async function runAllCases() {
+  const runAllBtn = document.getElementById("run-all-btn");
+  const progressEl = document.getElementById("run-all-progress");
+  const summaryEl = document.getElementById("run-all-summary");
+
+  runAllBtn.disabled = true;
+  summaryEl.textContent = "";
+  const counts = { ok: 0, refused: 0, malformed: 0, error: 0 };
+
+  for (let i = 0; i < RUN_TARGETS.length; i++) {
+    const target = RUN_TARGETS[i];
+    progressEl.textContent = "Running " + (i + 1) + " of " + RUN_TARGETS.length + ": " + target.batch.batch_id + "...";
+    const outcome = await runCase(target.batch, target.outputEl);
+    counts[outcome] = (counts[outcome] || 0) + 1;
+  }
+
+  progressEl.textContent = "Done: " + RUN_TARGETS.length + " of " + RUN_TARGETS.length + " cases run.";
+  summaryEl.textContent = "OK: " + counts.ok +
+    " | REFUSED-ESCALATE: " + counts.refused +
+    " | Errors: " + (counts.error + counts.malformed) +
+    " (" + counts.error + " API/network errors, " + counts.malformed + " format-mismatch)";
+  runAllBtn.disabled = false;
+}
+
+document.getElementById("run-all-btn").addEventListener("click", runAllCases);
 
 </script>
 </body>
