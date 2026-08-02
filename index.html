@@ -271,6 +271,7 @@ p { margin: var(--sp-2) 0; }
   <div class="panel">
     <div class="panel-head">Cases</div>
     <div class="panel-body">
+      <div id="demo-chips"></div>
       <button type="button" class="btn" id="run-all-btn">Run All</button>
       <span id="run-all-progress"></span>
       <p id="run-all-summary"></p>
@@ -617,6 +618,19 @@ function renderRunLog() {
       escapeHtml(entry.caseLabel) + " — " + escapeHtml(entry.agentDecision) +
       ' — <span class="' + actionClass + '">' + escapeHtml(entry.humanAction) + "</span>";
     logEl.appendChild(row);
+  });
+}
+
+/* ═══ ONE-CLICK DEMO CHIPS ═══ */
+function renderDemoChips() {
+  const container = document.getElementById("demo-chips");
+  container.innerHTML = "";
+  EVAL_CASES.forEach(function(ec) {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.textContent = ec.case_name;
+    chip.addEventListener("click", function() { selectCase(ec.batch_id); });
+    container.appendChild(chip);
   });
 }
 
@@ -1065,6 +1079,7 @@ document.getElementById("run-all-btn").addEventListener("click", runAllCases);
 
 /* ═══ INIT ═══ */
 updateTopbarMeta();
+renderDemoChips();
 renderCaseList();
 renderMainPanel();
 
