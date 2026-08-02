@@ -197,7 +197,8 @@ const OUTPUT_FIELDS = [
   { key: "manufactured_date", label: "Manufactured Date" },
   { key: "previously_transferred", label: "Previously Transferred" },
   { key: "returned_from_customer_order", label: "Returned From Customer Order" },
-  { key: "why", label: "Why" }
+  { key: "why", label: "Why" },
+  { key: "citations", label: "Citations" }
 ];
 
 const OUTPUT_FORMAT_BLOCK = OUTPUT_FIELDS.map(function(f) { return f.label + ": ..."; }).join("\n");
@@ -216,6 +217,7 @@ RULES - you must not:
 - Create a transfer order without the warehouse manager first approving the destination store and transfer quantity. Only humans perform and confirm physical dispatch and receipt.
 - Recommend a destination store without checking that destination's existing on-hand inventory of the same SKU (given in each destination candidate's existing_inventory_units_of_same_sku field). A destination that already holds substantial inventory of the SKU relative to its own demand must not be recommended over a destination with genuine unmet need (lower existing inventory relative to demand), even if its raw demand number is higher.
 - Trust a forecast_confidence label at face value. A forecast is acceptable only if it is labeled medium or high AND the same SKU/destination store's most recent forecast error in recent_recommendation_history is within +/-20% of actual demand. If the label says medium or high but the most recent recorded error for that SKU/store exceeds +/-20%, treat confidence as unacceptable and escalate, even though the label alone looks fine.
+- Cite a policy section number or record ID (batch, forecast, store, quality-flag, or log ID) in the Citations field that does not actually appear in the provided context. If a case is missing data you would need to cite, ask for it or escalate instead of inventing a citation or a fact.
 
 OUTPUT:
 Respond using exactly this line format, one field per line, in this exact order, with no extra commentary before or after and no blank lines between fields:
@@ -224,6 +226,8 @@ ${OUTPUT_FORMAT_BLOCK}
 The Status field must be exactly "OK" or "REFUSED-ESCALATE - <short reason citing the rule or policy section>". Use REFUSED-ESCALATE whenever any RULE above or ESCALATION trigger below applies (quality gate, low forecast confidence, missing or inconsistent data, no eligible destination, no destination with genuine unmet need, over-cap quantity, or insufficient shelf life after arrival). When Status is REFUSED-ESCALATE, still fill in every other field: use "N/A" for fields that do not apply (for example Recommended Destination Store or Recommended Transfer Quantity), but always state the real Units At Risk, Expiry Date, Manufactured Date, Previously Transferred, Returned From Customer Order, and Why from the actual data.
 
 The Why line must name the exact data you used (batch ID, store IDs, forecast numbers, existing inventory figures) and the exact policy section you applied (for example "Section 4" or "Section 7").
+
+The Citations field must be a comma-separated list of the exact policy section numbers and exact record IDs from the provided context that this decision relies on (for example: "Section 3, Section 5, BAT-001, FC-002, ST02"). Only cite identifiers that actually exist in the context you were given — never invent one. If a fact you would need is missing from the context, say so in Why and escalate rather than citing something that isn't there.
 
 ESCALATION:
 Stop and escalate, stating the reason, when confidence is low, data is missing, the request is out of policy, or stakes are high - specifically:
@@ -446,7 +450,7 @@ function renderParsedOutput(container, text, batch) {
 
   const dl = document.createElement("dl");
   OUTPUT_FIELDS.forEach(function(f) {
-    if (f.key === "why" || f.key === "status") return;
+    if (f.key === "why" || f.key === "status" || f.key === "citations") return;
     const dt = document.createElement("dt");
     dt.textContent = f.label;
     const dd = document.createElement("dd");
@@ -462,6 +466,23 @@ function renderParsedOutput(container, text, batch) {
   whyP.appendChild(whyLabel);
   whyP.appendChild(document.createTextNode(parsed.fields.why));
   container.appendChild(whyP);
+
+  const citationsP = document.createElement("p");
+  const citationsLabel = document.createElement("strong");
+  citationsLabel.textContent = "Citations: ";
+  citationsP.appendChild(citationsLabel);
+  parsed.fields.citations.split(",").forEach(function(rawTag) {
+    const tag = rawTag.trim();
+    if (!tag) return;
+    const tagSpan = document.createElement("span");
+    tagSpan.textContent = tag;
+    tagSpan.style.border = "1px solid";
+    tagSpan.style.padding = "0 4px";
+    tagSpan.style.marginRight = "4px";
+    tagSpan.style.fontSize = "0.85em";
+    citationsP.appendChild(tagSpan);
+  });
+  container.appendChild(citationsP);
 
   addReviewGate(container, batch, parsed.fields);
 }
