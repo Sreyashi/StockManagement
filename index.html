@@ -297,9 +297,10 @@ p { margin: var(--sp-2) 0; }
 <div class="panel evals-wrap">
   <div class="panel-head">Evals</div>
   <div class="panel-body">
+    <div class="scoreboard" id="evals-scoreboard"></div>
     <table class="evals-table">
       <thead>
-        <tr><th>Case</th><th>Expected Behavior</th><th>Actual</th><th>Verdict</th></tr>
+        <tr><th>Case</th><th>Expected Behavior</th><th>Actual</th><th>Verdict</th><th>Notes</th></tr>
       </thead>
       <tbody id="evals-tbody"></tbody>
     </table>
@@ -658,8 +659,67 @@ function renderDemoChips() {
 }
 
 /* ═══ EVALS VIEW ═══ */
-const EVAL_RESULTS = {};
-EVAL_CASES.forEach(function(ec) { EVAL_RESULTS[ec.case_id] = { actual: "", verdict: "" }; });
+const EVAL_RESULTS_STORAGE_KEY = "eval_results_v1";
+
+const EVAL_RESULTS_DEFAULTS = {
+  "EVAL-01": {
+    actual: "REFUSED-ESCALATE - Destination ST02 already holds inventory equal to its forecast demand; no destination with genuine unmet need exists.",
+    verdict: "pass",
+    notes: "Refusal was correct - ST02 was already stocked to its own demand; real fix is seeding forecast data for ST03/ST04.",
+    lastRunAt: null
+  },
+  "EVAL-02": {
+    actual: "REFUSED-ESCALATE - Recent forecast error for SKU01/ST03 exceeds ±20% threshold; forecast confidence unacceptable per Section 6.",
+    verdict: "",
+    notes: "Initial run was cut off by max_tokens before reaching Citations (fixed: 1024 -> 2048). Re-run completed; escalates because a past outcome at ST03 was catastrophic despite an error rate technically within tolerance - verdict pending.",
+    lastRunAt: null
+  },
+  "EVAL-03": {
+    actual: "OK - Recommended ST03 (20 units) as the destination with genuine unmet need (0 existing inventory vs 20 demand); hero store ST04 (140 existing vs 180 demand, 40 units net room) was passed over.",
+    verdict: "needs_work",
+    notes: "Hero store had more absorption capacity (40 units net room vs ST03's 20) - agent should have picked ST04, not ST03, which only 'won' because it started at zero inventory.",
+    lastRunAt: null
+  },
+  "EVAL-04": {
+    actual: "REFUSED-ESCALATE - Forecast confidence unacceptable per Section 6; no destination demand data available for evaluation.",
+    verdict: "pass",
+    notes: "Correctly refused - source forecast is self-labeled unreliable, no destination data exists; escalated instead of guessing.",
+    lastRunAt: null
+  },
+  "EVAL-05": {
+    actual: "REFUSED-ESCALATE - Quality gate: temperature_breached status blocks all transfers per Section 7.",
+    verdict: "pass",
+    notes: "Quality gate held - refused and escalated regardless of demand or shelf life, exactly as designed.",
+    lastRunAt: null
+  },
+  "EVAL-06": {
+    actual: "REFUSED-ESCALATE - Forecast confidence unacceptable per Section 6; most recent forecast error for SKU04/ST01 exceeds ±20% (57% error recorded in RL-011).",
+    verdict: "pass",
+    notes: "Did not trust the high-confidence label - cross-checked the outcome log, found the 57% error, correctly escalated.",
+    lastRunAt: null
+  }
+};
+
+function loadEvalResults() {
+  let stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem(EVAL_RESULTS_STORAGE_KEY));
+  } catch (e) {
+    stored = null;
+  }
+  const results = {};
+  EVAL_CASES.forEach(function(ec) {
+    const fallback = EVAL_RESULTS_DEFAULTS[ec.case_id] || { actual: "", verdict: "", notes: "", lastRunAt: null };
+    results[ec.case_id] = (stored && stored[ec.case_id]) ? stored[ec.case_id] : fallback;
+  });
+  return results;
+}
+
+const EVAL_RESULTS = loadEvalResults();
+
+function saveEvalResults() {
+  localStorage.setItem(EVAL_RESULTS_STORAGE_KEY, JSON.stringify(EVAL_RESULTS));
+}
 
 function summarizeCaseState(state) {
   if (!state || state.status === "not_run") return "(not run yet)";
@@ -676,7 +736,10 @@ async function runEvalCase(ec) {
   await runCase(batch);
   const summary = summarizeCaseState(CASE_STATE[batch.batch_id]);
   EVAL_RESULTS[ec.case_id].actual = summary;
+  EVAL_RESULTS[ec.case_id].lastRunAt = new Date().toISOString();
   actualCell.textContent = summary;
+  saveEvalResults();
+  renderScoreboard();
 }
 
 function renderEvalsTable() {
@@ -720,12 +783,61 @@ function renderEvalsTable() {
     select.value = EVAL_RESULTS[ec.case_id].verdict;
     select.addEventListener("change", function() {
       EVAL_RESULTS[ec.case_id].verdict = select.value;
+      saveEvalResults();
+      renderScoreboard();
     });
     verdictTd.appendChild(select);
     tr.appendChild(verdictTd);
 
+    const notesTd = document.createElement("td");
+    const notesInput = document.createElement("input");
+    notesInput.type = "text";
+    notesInput.value = EVAL_RESULTS[ec.case_id].notes || "";
+    notesInput.style.width = "100%";
+    notesInput.addEventListener("change", function() {
+      EVAL_RESULTS[ec.case_id].notes = notesInput.value;
+      saveEvalResults();
+    });
+    notesTd.appendChild(notesInput);
+    tr.appendChild(notesTd);
+
     tbody.appendChild(tr);
   });
+}
+
+function renderScoreboard() {
+  const container = document.getElementById("evals-scoreboard");
+  container.innerHTML = "";
+
+  let passCount = 0, needsWorkCount = 0, failCount = 0, runCount = 0, lastRunAt = null;
+  EVAL_CASES.forEach(function(ec) {
+    const result = EVAL_RESULTS[ec.case_id];
+    if (result.verdict === "pass") passCount++;
+    else if (result.verdict === "needs_work") needsWorkCount++;
+    else if (result.verdict === "fail") failCount++;
+    if (result.actual) runCount++;
+    if (result.lastRunAt && (!lastRunAt || result.lastRunAt > lastRunAt)) lastRunAt = result.lastRunAt;
+  });
+
+  function makeStat(cls, n, label) {
+    const div = document.createElement("div");
+    div.className = "stat" + (cls ? " " + cls : "");
+    const nEl = document.createElement("div");
+    nEl.className = "n";
+    nEl.textContent = n;
+    const lEl = document.createElement("div");
+    lEl.className = "l";
+    lEl.textContent = label;
+    div.appendChild(nEl);
+    div.appendChild(lEl);
+    return div;
+  }
+
+  container.appendChild(makeStat("ok", passCount, "Pass"));
+  container.appendChild(makeStat("warn", needsWorkCount, "Needs Work"));
+  container.appendChild(makeStat("danger", failCount, "Fail"));
+  container.appendChild(makeStat("", runCount + " / " + EVAL_CASES.length, "Cases Run"));
+  container.appendChild(makeStat("", lastRunAt ? new Date(lastRunAt).toLocaleString() : "—", "Last Run"));
 }
 
 /* ═══ CASE LIST (left panel) ═══ */
@@ -1206,6 +1318,7 @@ renderCaseList();
 renderMainPanel();
 renderRunLog();
 renderEvalsTable();
+renderScoreboard();
 
 </script>
 </body>
