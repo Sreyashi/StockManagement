@@ -669,6 +669,14 @@ function makeBtn(label) {
   return b;
 }
 
+function makeStageLabel(n, text) {
+  const div = document.createElement("div");
+  div.className = "stage";
+  div.setAttribute("data-n", String(n));
+  div.textContent = text;
+  return div;
+}
+
 /* ═══ REVIEW GATE ═══ */
 function recordHumanAction(batch, state, action) {
   state.humanAction = action;
@@ -744,44 +752,49 @@ function addReviewGate(container, batch, state) {
   });
 }
 
-/* ═══ PARSED RESULT RENDER ═══ */
-function renderParsedResult(container, batch, state) {
-  const parsed = state.parsed;
+/* ═══ STAGE 3 — DECISION: what the agent chose and why ═══ */
+function renderStage3Decision(container, state) {
+  if (state.status === "not_run") { container.textContent = "(not run yet)"; return; }
+  if (state.status === "running") { container.textContent = "Running..."; return; }
+  if (state.status === "error") { container.textContent = state.message; return; }
+  if (!state.parsed.ok) { container.textContent = "agent output did not match format"; return; }
 
-  if (!parsed.ok) {
-    const notice = document.createElement("p");
-    notice.textContent = "agent output did not match format";
-    container.appendChild(notice);
+  const badge = document.createElement("span");
+  badge.className = "badge " + (state.parsed.fields.status.indexOf("REFUSED-ESCALATE") === 0 ? "danger" : "ok");
+  badge.textContent = state.parsed.fields.status;
+  container.appendChild(badge);
+
+  const whyP = document.createElement("p");
+  const whyLabel = document.createElement("strong");
+  whyLabel.textContent = "Why: ";
+  whyP.appendChild(whyLabel);
+  whyP.appendChild(document.createTextNode(state.parsed.fields.why));
+  container.appendChild(whyP);
+}
+
+/* ═══ STAGE 4 — OUTPUT: the labeled fields, judgeable in under a minute ═══ */
+function renderStage4Output(container, state) {
+  if (state.status !== "done") { container.textContent = "—"; return; }
+
+  if (!state.parsed.ok) {
     const raw = document.createElement("pre");
     raw.textContent = state.rawText;
     container.appendChild(raw);
     return;
   }
 
-  const badge = document.createElement("span");
-  badge.className = "badge " + (parsed.fields.status.indexOf("REFUSED-ESCALATE") === 0 ? "danger" : "ok");
-  badge.textContent = parsed.fields.status;
-  container.appendChild(badge);
-
   const fieldsDiv = document.createElement("div");
   OUTPUT_FIELDS.forEach(function(f) {
     if (f.key === "why" || f.key === "status" || f.key === "citations") return;
-    fieldsDiv.appendChild(makeFieldRow(f.label, parsed.fields[f.key]));
+    fieldsDiv.appendChild(makeFieldRow(f.label, state.parsed.fields[f.key]));
   });
   container.appendChild(fieldsDiv);
-
-  const whyP = document.createElement("p");
-  const whyLabel = document.createElement("strong");
-  whyLabel.textContent = "Why: ";
-  whyP.appendChild(whyLabel);
-  whyP.appendChild(document.createTextNode(parsed.fields.why));
-  container.appendChild(whyP);
 
   const citationsP = document.createElement("p");
   const citationsLabel = document.createElement("strong");
   citationsLabel.textContent = "Citations: ";
   citationsP.appendChild(citationsLabel);
-  parsed.fields.citations.split(",").forEach(function(rawTag) {
+  state.parsed.fields.citations.split(",").forEach(function(rawTag) {
     const tag = rawTag.trim();
     if (!tag) return;
     const chip = document.createElement("span");
@@ -790,7 +803,11 @@ function renderParsedResult(container, batch, state) {
     citationsP.appendChild(chip);
   });
   container.appendChild(citationsP);
+}
 
+/* ═══ STAGE 5 — REVIEW: approve / edit / escalate ═══ */
+function renderStage5Review(container, batch, state) {
+  if (state.status !== "done" || !state.parsed.ok) { container.textContent = "—"; return; }
   addReviewGate(container, batch, state);
 }
 
@@ -820,18 +837,24 @@ function renderMainPanel() {
   heading.textContent = batch.batch_id + " — " + batch.sku_name + " @ " + batch.store_name;
   body.appendChild(heading);
 
-  const summaryDiv = document.createElement("div");
-  summaryDiv.appendChild(makeFieldRow("Expiry", batch.expiry_date + " (" + batch.hours_to_expiry + "h remaining)"));
-  summaryDiv.appendChild(makeFieldRow("On Hand", batch.on_hand_qty + " units"));
-  summaryDiv.appendChild(makeFieldRow("Quality Status", batch.quality_status));
-  summaryDiv.appendChild(makeFieldRow("Previously Transferred", String(batch.previously_transferred)));
-  summaryDiv.appendChild(makeFieldRow("Returned From Customer", String(batch.returned_from_customer)));
-  body.appendChild(summaryDiv);
+  /* STAGE 1 — INPUT: the case */
+  body.appendChild(makeStageLabel(1, "Input"));
+  const inputDiv = document.createElement("div");
+  inputDiv.appendChild(makeFieldRow("Expiry", batch.expiry_date + " (" + batch.hours_to_expiry + "h remaining)"));
+  inputDiv.appendChild(makeFieldRow("On Hand", batch.on_hand_qty + " units"));
+  inputDiv.appendChild(makeFieldRow("Quality Status", batch.quality_status));
+  inputDiv.appendChild(makeFieldRow("Previously Transferred", String(batch.previously_transferred)));
+  inputDiv.appendChild(makeFieldRow("Returned From Customer", String(batch.returned_from_customer)));
+  body.appendChild(inputDiv);
+
+  /* STAGE 2 — CONTEXT: the records and policy the agent reads */
+  body.appendChild(makeStageLabel(2, "Context"));
+  const contextDiv = document.createElement("div");
 
   const forecasts = DEMAND_FORECAST.filter(function(f) { return f.batch_id === batch.batch_id; });
   const forecastHeading = document.createElement("p");
   forecastHeading.innerHTML = "<strong>Linked demand forecast:</strong>";
-  body.appendChild(forecastHeading);
+  contextDiv.appendChild(forecastHeading);
   const forecastList = document.createElement("ul");
   forecasts.forEach(function(f) {
     const li = document.createElement("li");
@@ -839,14 +862,14 @@ function renderMainPanel() {
       f.pre_labeled_expected_demand_units + " units, confidence " + f.forecast_confidence + " (" + f.notes + ")";
     forecastList.appendChild(li);
   });
-  body.appendChild(forecastList);
+  contextDiv.appendChild(forecastList);
 
   const distances = STORE_DISTANCES.filter(function(d) {
     return d.store_a_id === batch.store_id || d.store_b_id === batch.store_id;
   });
   const distanceHeading = document.createElement("p");
   distanceHeading.innerHTML = "<strong>Linked store distances from " + batch.store_id + ":</strong>";
-  body.appendChild(distanceHeading);
+  contextDiv.appendChild(distanceHeading);
   const distanceList = document.createElement("ul");
   distances.forEach(function(d) {
     const otherName = d.store_a_id === batch.store_id ? d.store_b_name : d.store_a_name;
@@ -855,12 +878,12 @@ function renderMainPanel() {
     li.textContent = otherId + " (" + otherName + "): " + d.distance_km + " km, " + d.transport_time_min + " min transport";
     distanceList.appendChild(li);
   });
-  body.appendChild(distanceList);
+  contextDiv.appendChild(distanceList);
 
   const flags = QUALITY_FLAGS.filter(function(q) { return q.batch_id === batch.batch_id; });
   const flagHeading = document.createElement("p");
   flagHeading.innerHTML = "<strong>Linked quality flag:</strong>";
-  body.appendChild(flagHeading);
+  contextDiv.appendChild(flagHeading);
   const flagList = document.createElement("ul");
   if (flags.length === 0) {
     const li = document.createElement("li");
@@ -873,23 +896,37 @@ function renderMainPanel() {
       flagList.appendChild(li);
     });
   }
-  body.appendChild(flagList);
+  contextDiv.appendChild(flagList);
 
+  const policyNote = document.createElement("p");
+  policyNote.innerHTML = "<strong>Policy read:</strong> policies/" + POLICY_FILES[0].filename;
+  contextDiv.appendChild(policyNote);
+
+  body.appendChild(contextDiv);
+
+  const runBtnWrap = document.createElement("div");
   const runBtn = makeBtn("Run");
   runBtn.addEventListener("click", function() { runCase(batch); });
-  body.appendChild(runBtn);
+  runBtnWrap.appendChild(runBtn);
+  body.appendChild(runBtnWrap);
 
+  /* STAGE 3 — DECISION: what it chose and why */
+  body.appendChild(makeStageLabel(3, "Decision"));
+  const decisionDiv = document.createElement("div");
+  renderStage3Decision(decisionDiv, state);
+  body.appendChild(decisionDiv);
+
+  /* STAGE 4 — OUTPUT: the labeled fields */
+  body.appendChild(makeStageLabel(4, "Output"));
   const outputDiv = document.createElement("div");
-  if (state.status === "not_run") {
-    outputDiv.textContent = "(not run yet)";
-  } else if (state.status === "running") {
-    outputDiv.textContent = "Running...";
-  } else if (state.status === "error") {
-    outputDiv.textContent = state.message;
-  } else if (state.status === "done") {
-    renderParsedResult(outputDiv, batch, state);
-  }
+  renderStage4Output(outputDiv, state);
   body.appendChild(outputDiv);
+
+  /* STAGE 5 — REVIEW: approve / edit / escalate */
+  body.appendChild(makeStageLabel(5, "Review"));
+  const reviewDiv = document.createElement("div");
+  renderStage5Review(reviewDiv, batch, state);
+  body.appendChild(reviewDiv);
 }
 
 function refreshIfSelected(batchId) {
