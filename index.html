@@ -621,10 +621,17 @@ function renderRunLog() {
 }
 
 /* ═══ CASE LIST (left panel) ═══ */
+const HUMAN_ACTION_BADGE = {
+  Approved: ["ok", "Approved"],
+  Edited: ["warn", "Edited"],
+  Escalated: ["danger", "Escalated"]
+};
+
 function renderCaseList() {
   const listEl = document.getElementById("case-list");
   listEl.innerHTML = "";
   BATCHES.forEach(function(batch) {
+    const state = CASE_STATE[batch.batch_id];
     const card = document.createElement("div");
     card.className = "case-card" + (batch.batch_id === SELECTED_BATCH_ID ? " active" : "");
     const idDiv = document.createElement("div");
@@ -635,6 +642,15 @@ function renderCaseList() {
     titleDiv.textContent = batch.sku_name + " @ " + batch.store_name;
     card.appendChild(idDiv);
     card.appendChild(titleDiv);
+
+    if (state.humanAction) {
+      const pair = HUMAN_ACTION_BADGE[state.humanAction.type] || ["neutral", state.humanAction.type];
+      const badge = document.createElement("span");
+      badge.className = "badge " + pair[0];
+      badge.textContent = pair[1];
+      card.appendChild(badge);
+    }
+
     card.addEventListener("click", function() { selectCase(batch.batch_id); });
     listEl.appendChild(card);
   });
@@ -661,10 +677,10 @@ function makeFieldRow(label, value) {
   return row;
 }
 
-function makeBtn(label) {
+function makeBtn(label, extraClass) {
   const b = document.createElement("button");
   b.type = "button";
-  b.className = "btn";
+  b.className = "btn" + (extraClass ? " " + extraClass : "");
   b.textContent = label;
   return b;
 }
@@ -682,15 +698,16 @@ function recordHumanAction(batch, state, action) {
   state.humanAction = action;
   const actionText = action.type === "Approved" ? "Approved" : action.type + ": " + action.detail;
   appendRunLogEntry(batch, state.parsed.fields, actionText, action.type);
+  renderCaseList();
   if (SELECTED_BATCH_ID === batch.batch_id) renderMainPanel();
 }
 
 function addReviewGate(container, batch, state) {
   const gateDiv = document.createElement("div");
 
-  const approveBtn = makeBtn("Approve");
+  const approveBtn = makeBtn("Approve", "approve");
   const editBtn = makeBtn("Edit");
-  const escalateBtn = makeBtn("Escalate");
+  const escalateBtn = makeBtn("Escalate", "danger");
   const statusText = document.createElement("span");
 
   gateDiv.appendChild(approveBtn);
@@ -807,8 +824,18 @@ function renderStage4Output(container, state) {
 
 /* ═══ STAGE 5 — REVIEW: approve / edit / escalate ═══ */
 function renderStage5Review(container, batch, state) {
-  if (state.status !== "done" || !state.parsed.ok) { container.textContent = "—"; return; }
-  addReviewGate(container, batch, state);
+  if (state.status !== "done" || !state.parsed.ok) {
+    const placeholder = document.createElement("p");
+    placeholder.textContent = "—";
+    container.appendChild(placeholder);
+  } else {
+    addReviewGate(container, batch, state);
+  }
+
+  const boundaryNote = document.createElement("p");
+  boundaryNote.className = "boundary-note";
+  boundaryNote.textContent = "Nothing is sent without human approval.";
+  container.appendChild(boundaryNote);
 }
 
 /* ═══ MAIN PANEL (selected case detail) ═══ */
