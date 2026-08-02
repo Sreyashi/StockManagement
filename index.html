@@ -1,40 +1,296 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-skin="ops">
 <head>
 <meta charset="UTF-8">
 <title>Near-Expiry Inventory Transfer Agent</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   AGENTIC AI CAPSTONE — LOCKED DESIGN TOKENS  v0.3
+   The look ships in the box. Nobody chooses a font.
+
+   RULES (for the AI building the prototype):
+   - Inline this file into index.html. Use ONLY these tokens.
+   - No new colors. No new fonts. No emoji as icons.
+   - Skins switch by setting data-skin="ops" | "studio" | "term" on <html>.
+   - Never render body text below 13px (--fs-0).
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* type */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --fs-0: 13px;  /* meta, log lines — absolute floor */
+  --fs-1: 14px;  /* body */
+  --fs-2: 16px;  /* emphasized body, buttons */
+  --fs-3: 20px;  /* panel titles */
+  --fs-4: 28px;  /* page title, stat numbers */
+  --lh: 1.5;
+
+  /* spacing & shape */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --border-w: 1px;
+
+  /* status colors — shared across all skins */
+  --ok: #1FA971;        /* pass / approved */
+  --warn: #D98E04;      /* needs work / pending */
+  --danger: #D64545;    /* fail / escalate / refused */
+  --info: #3B82F6;      /* running / info */
+}
+
+/* ── SKIN: OPERATIONS (dark) — default ─────────────────────────── */
+:root, [data-skin="ops"] {
+  --bg: #0F1420;         /* page */
+  --bg-raise: #171E2E;   /* panels, cards */
+  --bg-inset: #0B0F18;   /* wells, log */
+  --line: #263049;       /* borders */
+  --ink: #E8EDF7;        /* headings, primary text */
+  --ink-2: #9AA6BF;      /* secondary text */
+  --ink-3: #5E6A85;      /* meta */
+  --accent: #6C8CFF;     /* brand accent: buttons, active states */
+  --accent-ink: #FFFFFF; /* text on accent */
+  --chip: #1E2740;       /* tags, chips */
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -12px rgba(0,0,0,.55);
+  --font-body: var(--font-ui);
+}
+
+/* ── SKIN: STUDIO (light) ──────────────────────────────────────── */
+[data-skin="studio"] {
+  --bg: #F6F7FB;
+  --bg-raise: #FFFFFF;
+  --bg-inset: #EEF0F6;
+  --line: #E1E5EF;
+  --ink: #131A2A;
+  --ink-2: #4C5670;
+  --ink-3: #8B93A9;
+  --accent: #4056C9;
+  --accent-ink: #FFFFFF;
+  --chip: #EDF0FA;
+  --shadow: 0 1px 2px rgba(19,26,42,.06), 0 12px 28px -14px rgba(19,26,42,.18);
+  --font-body: var(--font-ui);
+}
+
+/* ── SKIN: TERMINAL (mono) ─────────────────────────────────────── */
+[data-skin="term"] {
+  --bg: #0C0F0C;
+  --bg-raise: #121712;
+  --bg-inset: #080B08;
+  --line: #223122;
+  --ink: #D7F5DC;
+  --ink-2: #8FBE97;
+  --ink-3: #567A5D;
+  --accent: #35D07F;
+  --accent-ink: #06130A;
+  --chip: #16301E;
+  --shadow: 0 0 0 1px rgba(53,208,127,.08), 0 12px 32px -14px rgba(0,0,0,.7);
+  --font-body: var(--font-mono);
+}
+
+/* ═══ BASE ═══ */
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: var(--fs-1); line-height: var(--lh);
+}
+
+/* ═══ LAYOUT ═══ */
+.topbar {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-5);
+  background: var(--bg-raise); border-bottom: var(--border-w) solid var(--line);
+}
+.topbar .product { font-size: var(--fs-2); font-weight: 700; letter-spacing: .01em; }
+.topbar .meta { color: var(--ink-3); font-size: var(--fs-0); margin-left: auto; }
+
+.console {
+  display: grid; grid-template-columns: 300px 1fr 320px;
+  gap: var(--sp-4); padding: var(--sp-4); align-items: start;
+  min-height: calc(100vh - 58px);
+}
+@media (max-width: 1100px) { .console { grid-template-columns: 1fr; } }
+
+.panel {
+  background: var(--bg-raise); border: var(--border-w) solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.panel-head {
+  padding: var(--sp-3) var(--sp-4); border-bottom: var(--border-w) solid var(--line);
+  font-size: var(--fs-0); font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-2);
+}
+.panel-body { padding: var(--sp-4); }
+
+/* ═══ STAGE LABELS — the loop, named on screen ═══ */
+.stage {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-0); font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--accent); margin: var(--sp-4) 0 var(--sp-2);
+}
+.stage::before {
+  content: attr(data-n); display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink);
+  font-size: 11px; letter-spacing: 0;
+}
+
+/* ═══ CARDS (case list) ═══ */
+.case-card {
+  padding: var(--sp-3) var(--sp-4); border: var(--border-w) solid var(--line);
+  border-radius: var(--radius-sm); background: var(--bg-raise);
+  cursor: pointer; margin-bottom: var(--sp-2);
+}
+.case-card:hover { border-color: var(--accent); }
+.case-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.case-card .id { font-family: var(--font-mono); font-size: var(--fs-0); color: var(--ink-3); }
+.case-card .title { font-weight: 600; }
+
+/* ═══ CHIPS (one-click demo cases, citations) ═══ */
+.chip {
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  padding: 4px 12px; border-radius: 999px;
+  background: var(--chip); color: var(--ink-2);
+  border: var(--border-w) solid var(--line);
+  font-size: var(--fs-0); font-weight: 600; cursor: pointer;
+}
+.chip:hover { color: var(--ink); border-color: var(--accent); }
+.chip.cite { cursor: default; font-family: var(--font-mono); }
+
+/* ═══ OUTPUT FIELDS — labeled, judgeable in under a minute ═══ */
+.field { display: grid; grid-template-columns: 160px 1fr; gap: var(--sp-3); padding: var(--sp-2) 0; border-bottom: var(--border-w) solid var(--line); }
+.field:last-child { border-bottom: 0; }
+.field .k { font-size: var(--fs-0); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); padding-top: 2px; }
+.field .v { color: var(--ink); }
+.field .v.why { color: var(--ink-2); font-style: italic; }
+
+/* ═══ STATUS BADGES ═══ */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px;
+  font-size: var(--fs-0); font-weight: 700; letter-spacing: .04em;
+}
+.badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.badge.ok      { color: var(--ok);     background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.badge.warn    { color: var(--warn);   background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.badge.danger  { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.badge.info    { color: var(--info);   background: color-mix(in srgb, var(--info) 14%, transparent); }
+.badge.neutral { color: var(--ink-2);  background: var(--chip); }
+
+/* ═══ BUTTONS — the human gate ═══ */
+.btn {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: 8px 18px; border-radius: var(--radius-sm);
+  border: var(--border-w) solid var(--line);
+  background: var(--bg-raise); color: var(--ink);
+  font-family: var(--font-body); font-size: var(--fs-1); font-weight: 700;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.approve { background: var(--ok); border-color: var(--ok); color: #fff; }
+.btn.danger  { background: transparent; border-color: var(--danger); color: var(--danger); }
+.btn.danger:hover { background: var(--danger); color: #fff; }
+
+/* ═══ THE BOUNDARY LINE — quiet, permanent ═══ */
+.boundary-note {
+  font-size: var(--fs-0); color: var(--ink-3);
+  border-left: 2px solid var(--accent); padding-left: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+
+/* ═══ RUN LOG ═══ */
+.log {
+  background: var(--bg-inset); border: var(--border-w) solid var(--line);
+  border-radius: var(--radius-sm); padding: var(--sp-3);
+  font-family: var(--font-mono); font-size: var(--fs-0);
+  max-height: 420px; overflow: auto;
+}
+.log .row { display: flex; gap: var(--sp-3); padding: 3px 0; color: var(--ink-2); }
+.log .row .t { color: var(--ink-3); flex: none; }
+.log .row .action-approve  { color: var(--ok); }
+.log .row .action-edit     { color: var(--warn); }
+.log .row .action-escalate { color: var(--danger); }
+
+/* ═══ EVALS ═══ */
+.evals-table { width: 100%; border-collapse: collapse; font-size: var(--fs-1); }
+.evals-table th {
+  text-align: left; font-size: var(--fs-0); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-3); padding: var(--sp-2) var(--sp-3); border-bottom: var(--border-w) solid var(--line);
+}
+.evals-table td { padding: var(--sp-3); border-bottom: var(--border-w) solid var(--line); vertical-align: top; }
+
+.scoreboard { display: flex; gap: var(--sp-4); margin-bottom: var(--sp-4); }
+.stat {
+  flex: 1; padding: var(--sp-4); text-align: center;
+  background: var(--bg-raise); border: var(--border-w) solid var(--line); border-radius: var(--radius);
+}
+.stat .n { font-size: var(--fs-4); font-weight: 800; line-height: 1.1; }
+.stat .l { font-size: var(--fs-0); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+.stat.ok .n { color: var(--ok); } .stat.warn .n { color: var(--warn); } .stat.danger .n { color: var(--danger); }
+
+/* ═══ STATES ═══ */
+.thinking { display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--info); font-weight: 600; }
+.thinking::before { content: ""; width: 12px; height: 12px; border: 2px solid var(--info); border-top-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.empty {
+  padding: var(--sp-6); text-align: center; color: var(--ink-2);
+}
+.empty .headline { font-size: var(--fs-3); font-weight: 700; color: var(--ink); margin-bottom: var(--sp-2); }
+
+.error-note {
+  padding: var(--sp-3) var(--sp-4); border-radius: var(--radius-sm);
+  border: var(--border-w) solid var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  color: var(--danger); font-size: var(--fs-1);
+}
+
+/* ═══ EXTENSIONS — form elements the kit doesn't style, built from the same tokens only ═══ */
+input[type="text"], input[type="password"], textarea {
+  background: var(--bg-inset); color: var(--ink); border: var(--border-w) solid var(--line);
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-3);
+  font-family: var(--font-body); font-size: var(--fs-1);
+}
+h1, h2, h3 { font-family: var(--font-body); color: var(--ink); }
+ul, ol { padding-left: var(--sp-5); }
+p { margin: var(--sp-2) 0; }
+</style>
 </head>
 <body>
 
-<h1>Near-Expiry Inventory Transfer Agent</h1>
-<p>World-load check: batches (cases) with their linked context, and the policy file in use.</p>
-
-<h2>Settings</h2>
-<div id="settings">
-  <label for="api-key-input">Anthropic API key:</label>
-  <input type="password" id="api-key-input" placeholder="Paste your key">
-  <button type="button" id="save-key-btn">Save</button>
-  <span id="key-status"></span>
+<div class="topbar">
+  <div class="product">Near-Expiry Inventory Transfer Agent</div>
+  <input type="password" id="api-key-input" placeholder="Anthropic API key">
+  <button type="button" class="btn" id="save-key-btn">Save Key</button>
+  <div class="meta" id="topbar-meta"></div>
 </div>
 
-<h2>Policy file</h2>
-<ul id="policy-list"></ul>
+<div class="console">
 
-<h2>Batches</h2>
-<div>
-  <button type="button" id="run-all-btn">Run All</button>
-  <span id="run-all-progress"></span>
-  <p id="run-all-summary"></p>
+  <div class="panel">
+    <div class="panel-head">Cases</div>
+    <div class="panel-body">
+      <button type="button" class="btn" id="run-all-btn">Run All</button>
+      <span id="run-all-progress"></span>
+      <p id="run-all-summary"></p>
+      <div id="case-list"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">Case Detail</div>
+    <div class="panel-body" id="main-panel-body"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">Run Log</div>
+    <div class="panel-body">
+      <div class="log" id="run-log"></div>
+    </div>
+  </div>
+
 </div>
-<div id="batches"></div>
-
-<h2>Run Log</h2>
-<table id="run-log-table">
-  <thead>
-    <tr><th>Time</th><th>Case</th><th>Agent Decision</th><th>Human Action</th></tr>
-  </thead>
-  <tbody id="run-log-body"></tbody>
-</table>
 
 <script>
 
@@ -247,9 +503,10 @@ Stop and escalate, stating the reason, when confidence is low, data is missing, 
 
 const API_KEY_STORAGE_KEY = "anthropic_api_key";
 
-function updateKeyStatus() {
-  const status = document.getElementById("key-status");
-  status.textContent = localStorage.getItem(API_KEY_STORAGE_KEY) ? "Key saved" : "No key saved";
+function updateTopbarMeta() {
+  const keyStatus = localStorage.getItem(API_KEY_STORAGE_KEY) ? "Key saved" : "No key saved";
+  document.getElementById("topbar-meta").textContent =
+    BATCHES.length + " cases · Policy: " + POLICY_FILES[0].filename + " · " + keyStatus;
 }
 
 document.getElementById("save-key-btn").addEventListener("click", function() {
@@ -259,10 +516,8 @@ document.getElementById("save-key-btn").addEventListener("click", function() {
     localStorage.setItem(API_KEY_STORAGE_KEY, value);
     input.value = "";
   }
-  updateKeyStatus();
+  updateTopbarMeta();
 });
-
-updateKeyStatus();
 
 function getDestinationCandidates(batch) {
   const distances = STORE_DISTANCES.filter(function(d) {
@@ -319,47 +574,115 @@ function parseAgentOutput(text) {
   return { ok: allFound, fields: fields };
 }
 
+/* ═══ STATE ═══ */
+const CASE_STATE = {};
+BATCHES.forEach(function(b) { CASE_STATE[b.batch_id] = { status: "not_run" }; });
+let SELECTED_BATCH_ID = null;
 const RUN_LOG = [];
 
-function appendRunLogEntry(batch, parsedFields, humanAction) {
+function getBatchById(id) {
+  return BATCHES.filter(function(b) { return b.batch_id === id; })[0];
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/* ═══ RUN LOG ═══ */
+function appendRunLogEntry(batch, parsedFields, humanActionText, actionType) {
   RUN_LOG.push({
     time: new Date().toLocaleString(),
-    case: batch.batch_id + " (" + batch.sku_name + " @ " + batch.store_name + ")",
-    agent_decision: parsedFields.status + " - " + parsedFields.risk_summary,
-    human_action: humanAction
+    caseLabel: batch.batch_id + " (" + batch.sku_name + " @ " + batch.store_name + ")",
+    agentDecision: parsedFields.status + " - " + parsedFields.risk_summary,
+    humanAction: humanActionText,
+    actionType: actionType
   });
   renderRunLog();
 }
 
 function renderRunLog() {
-  const tbody = document.getElementById("run-log-body");
-  tbody.innerHTML = "";
+  const logEl = document.getElementById("run-log");
+  logEl.innerHTML = "";
   RUN_LOG.forEach(function(entry) {
-    const tr = document.createElement("tr");
-    ["time", "case", "agent_decision", "human_action"].forEach(function(key) {
-      const td = document.createElement("td");
-      td.textContent = entry[key];
-      tr.appendChild(td);
-    });
-    tbody.appendChild(tr);
+    const row = document.createElement("div");
+    row.className = "row";
+    const actionClass = entry.actionType === "Approved" ? "action-approve" :
+      entry.actionType === "Edited" ? "action-edit" : "action-escalate";
+    row.innerHTML =
+      '<span class="t"></span><span class="rest"></span>';
+    row.querySelector(".t").textContent = entry.time;
+    row.querySelector(".rest").innerHTML =
+      escapeHtml(entry.caseLabel) + " — " + escapeHtml(entry.agentDecision) +
+      ' — <span class="' + actionClass + '">' + escapeHtml(entry.humanAction) + "</span>";
+    logEl.appendChild(row);
   });
 }
 
-function addReviewGate(container, batch, parsedFields) {
+/* ═══ CASE LIST (left panel) ═══ */
+function renderCaseList() {
+  const listEl = document.getElementById("case-list");
+  listEl.innerHTML = "";
+  BATCHES.forEach(function(batch) {
+    const card = document.createElement("div");
+    card.className = "case-card" + (batch.batch_id === SELECTED_BATCH_ID ? " active" : "");
+    const idDiv = document.createElement("div");
+    idDiv.className = "id";
+    idDiv.textContent = batch.batch_id;
+    const titleDiv = document.createElement("div");
+    titleDiv.className = "title";
+    titleDiv.textContent = batch.sku_name + " @ " + batch.store_name;
+    card.appendChild(idDiv);
+    card.appendChild(titleDiv);
+    card.addEventListener("click", function() { selectCase(batch.batch_id); });
+    listEl.appendChild(card);
+  });
+}
+
+function selectCase(batchId) {
+  SELECTED_BATCH_ID = batchId;
+  renderCaseList();
+  renderMainPanel();
+}
+
+/* ═══ FIELD ROW HELPER ═══ */
+function makeFieldRow(label, value) {
+  const row = document.createElement("div");
+  row.className = "field";
+  const k = document.createElement("div");
+  k.className = "k";
+  k.textContent = label;
+  const v = document.createElement("div");
+  v.className = "v";
+  v.textContent = value;
+  row.appendChild(k);
+  row.appendChild(v);
+  return row;
+}
+
+function makeBtn(label) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "btn";
+  b.textContent = label;
+  return b;
+}
+
+/* ═══ REVIEW GATE ═══ */
+function recordHumanAction(batch, state, action) {
+  state.humanAction = action;
+  const actionText = action.type === "Approved" ? "Approved" : action.type + ": " + action.detail;
+  appendRunLogEntry(batch, state.parsed.fields, actionText, action.type);
+  if (SELECTED_BATCH_ID === batch.batch_id) renderMainPanel();
+}
+
+function addReviewGate(container, batch, state) {
   const gateDiv = document.createElement("div");
 
-  const approveBtn = document.createElement("button");
-  approveBtn.type = "button";
-  approveBtn.textContent = "Approve";
-
-  const editBtn = document.createElement("button");
-  editBtn.type = "button";
-  editBtn.textContent = "Edit";
-
-  const escalateBtn = document.createElement("button");
-  escalateBtn.type = "button";
-  escalateBtn.textContent = "Escalate";
-
+  const approveBtn = makeBtn("Approve");
+  const editBtn = makeBtn("Edit");
+  const escalateBtn = makeBtn("Escalate");
   const statusText = document.createElement("span");
 
   gateDiv.appendChild(approveBtn);
@@ -368,16 +691,17 @@ function addReviewGate(container, batch, parsedFields) {
   gateDiv.appendChild(statusText);
   container.appendChild(gateDiv);
 
-  function lockGate(label) {
+  if (state.humanAction) {
     approveBtn.disabled = true;
     editBtn.disabled = true;
     escalateBtn.disabled = true;
-    statusText.textContent = label;
+    const labels = { Approved: "Approved.", Edited: "Edited and saved.", Escalated: "Escalated." };
+    statusText.textContent = labels[state.humanAction.type] || "Done.";
+    return;
   }
 
   approveBtn.addEventListener("click", function() {
-    appendRunLogEntry(batch, parsedFields, "Approved");
-    lockGate("Approved.");
+    recordHumanAction(batch, state, { type: "Approved" });
   });
 
   editBtn.addEventListener("click", function() {
@@ -388,21 +712,15 @@ function addReviewGate(container, batch, parsedFields) {
     const editArea = document.createElement("textarea");
     editArea.rows = 8;
     editArea.cols = 60;
-    editArea.value = OUTPUT_FIELDS.map(function(f) { return f.label + ": " + parsedFields[f.key]; }).join("\n");
+    editArea.value = OUTPUT_FIELDS.map(function(f) { return f.label + ": " + state.parsed.fields[f.key]; }).join("\n");
 
-    const saveBtn = document.createElement("button");
-    saveBtn.type = "button";
-    saveBtn.textContent = "Save";
-
+    const saveBtn = makeBtn("Save");
     gateDiv.appendChild(editArea);
     gateDiv.appendChild(saveBtn);
 
     saveBtn.addEventListener("click", function() {
       const firstLine = editArea.value.split("\n")[0];
-      appendRunLogEntry(batch, parsedFields, "Edited: " + firstLine);
-      editArea.remove();
-      saveBtn.remove();
-      lockGate("Edited and saved.");
+      recordHumanAction(batch, state, { type: "Edited", detail: firstLine });
     });
   });
 
@@ -415,55 +733,42 @@ function addReviewGate(container, batch, parsedFields) {
     reasonInput.type = "text";
     reasonInput.placeholder = "One-line escalation reason";
 
-    const confirmBtn = document.createElement("button");
-    confirmBtn.type = "button";
-    confirmBtn.textContent = "Confirm escalation";
-
+    const confirmBtn = makeBtn("Confirm escalation");
     gateDiv.appendChild(reasonInput);
     gateDiv.appendChild(confirmBtn);
 
     confirmBtn.addEventListener("click", function() {
       const reason = reasonInput.value.trim() || "(no reason given)";
-      appendRunLogEntry(batch, parsedFields, "Escalated: " + reason);
-      reasonInput.remove();
-      confirmBtn.remove();
-      lockGate("Escalated.");
+      recordHumanAction(batch, state, { type: "Escalated", detail: reason });
     });
   });
 }
 
-function renderParsedOutput(container, text, batch) {
-  container.innerHTML = "";
-  const parsed = parseAgentOutput(text);
+/* ═══ PARSED RESULT RENDER ═══ */
+function renderParsedResult(container, batch, state) {
+  const parsed = state.parsed;
 
   if (!parsed.ok) {
     const notice = document.createElement("p");
     notice.textContent = "agent output did not match format";
     container.appendChild(notice);
     const raw = document.createElement("pre");
-    raw.textContent = text;
+    raw.textContent = state.rawText;
     container.appendChild(raw);
-    return parsed;
+    return;
   }
 
-  const statusP = document.createElement("p");
-  const statusLabel = document.createElement("strong");
-  statusLabel.textContent = "Status: ";
-  statusP.appendChild(statusLabel);
-  statusP.appendChild(document.createTextNode(parsed.fields.status));
-  container.appendChild(statusP);
+  const badge = document.createElement("span");
+  badge.className = "badge " + (parsed.fields.status.indexOf("REFUSED-ESCALATE") === 0 ? "danger" : "ok");
+  badge.textContent = parsed.fields.status;
+  container.appendChild(badge);
 
-  const dl = document.createElement("dl");
+  const fieldsDiv = document.createElement("div");
   OUTPUT_FIELDS.forEach(function(f) {
     if (f.key === "why" || f.key === "status" || f.key === "citations") return;
-    const dt = document.createElement("dt");
-    dt.textContent = f.label;
-    const dd = document.createElement("dd");
-    dd.textContent = parsed.fields[f.key];
-    dl.appendChild(dt);
-    dl.appendChild(dd);
+    fieldsDiv.appendChild(makeFieldRow(f.label, parsed.fields[f.key]));
   });
-  container.appendChild(dl);
+  container.appendChild(fieldsDiv);
 
   const whyP = document.createElement("p");
   const whyLabel = document.createElement("strong");
@@ -479,28 +784,132 @@ function renderParsedOutput(container, text, batch) {
   parsed.fields.citations.split(",").forEach(function(rawTag) {
     const tag = rawTag.trim();
     if (!tag) return;
-    const tagSpan = document.createElement("span");
-    tagSpan.textContent = tag;
-    tagSpan.style.border = "1px solid";
-    tagSpan.style.padding = "0 4px";
-    tagSpan.style.marginRight = "4px";
-    tagSpan.style.fontSize = "0.85em";
-    citationsP.appendChild(tagSpan);
+    const chip = document.createElement("span");
+    chip.className = "chip cite";
+    chip.textContent = tag;
+    citationsP.appendChild(chip);
   });
   container.appendChild(citationsP);
 
-  addReviewGate(container, batch, parsed.fields);
-  return parsed;
+  addReviewGate(container, batch, state);
 }
 
-async function runCase(batch, outputEl) {
+/* ═══ MAIN PANEL (selected case detail) ═══ */
+function renderMainPanel() {
+  const body = document.getElementById("main-panel-body");
+  body.innerHTML = "";
+
+  if (!SELECTED_BATCH_ID) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    const headline = document.createElement("div");
+    headline.className = "headline";
+    headline.textContent = "Select a case";
+    const p = document.createElement("p");
+    p.textContent = "Click a case in the list to see its full detail.";
+    empty.appendChild(headline);
+    empty.appendChild(p);
+    body.appendChild(empty);
+    return;
+  }
+
+  const batch = getBatchById(SELECTED_BATCH_ID);
+  const state = CASE_STATE[SELECTED_BATCH_ID];
+
+  const heading = document.createElement("h3");
+  heading.textContent = batch.batch_id + " — " + batch.sku_name + " @ " + batch.store_name;
+  body.appendChild(heading);
+
+  const summaryDiv = document.createElement("div");
+  summaryDiv.appendChild(makeFieldRow("Expiry", batch.expiry_date + " (" + batch.hours_to_expiry + "h remaining)"));
+  summaryDiv.appendChild(makeFieldRow("On Hand", batch.on_hand_qty + " units"));
+  summaryDiv.appendChild(makeFieldRow("Quality Status", batch.quality_status));
+  summaryDiv.appendChild(makeFieldRow("Previously Transferred", String(batch.previously_transferred)));
+  summaryDiv.appendChild(makeFieldRow("Returned From Customer", String(batch.returned_from_customer)));
+  body.appendChild(summaryDiv);
+
+  const forecasts = DEMAND_FORECAST.filter(function(f) { return f.batch_id === batch.batch_id; });
+  const forecastHeading = document.createElement("p");
+  forecastHeading.innerHTML = "<strong>Linked demand forecast:</strong>";
+  body.appendChild(forecastHeading);
+  const forecastList = document.createElement("ul");
+  forecasts.forEach(function(f) {
+    const li = document.createElement("li");
+    li.textContent = f.store_id + ": predicted " + f.predicted_demand_units + " units, pre-labeled expected " +
+      f.pre_labeled_expected_demand_units + " units, confidence " + f.forecast_confidence + " (" + f.notes + ")";
+    forecastList.appendChild(li);
+  });
+  body.appendChild(forecastList);
+
+  const distances = STORE_DISTANCES.filter(function(d) {
+    return d.store_a_id === batch.store_id || d.store_b_id === batch.store_id;
+  });
+  const distanceHeading = document.createElement("p");
+  distanceHeading.innerHTML = "<strong>Linked store distances from " + batch.store_id + ":</strong>";
+  body.appendChild(distanceHeading);
+  const distanceList = document.createElement("ul");
+  distances.forEach(function(d) {
+    const otherName = d.store_a_id === batch.store_id ? d.store_b_name : d.store_a_name;
+    const otherId = d.store_a_id === batch.store_id ? d.store_b_id : d.store_a_id;
+    const li = document.createElement("li");
+    li.textContent = otherId + " (" + otherName + "): " + d.distance_km + " km, " + d.transport_time_min + " min transport";
+    distanceList.appendChild(li);
+  });
+  body.appendChild(distanceList);
+
+  const flags = QUALITY_FLAGS.filter(function(q) { return q.batch_id === batch.batch_id; });
+  const flagHeading = document.createElement("p");
+  flagHeading.innerHTML = "<strong>Linked quality flag:</strong>";
+  body.appendChild(flagHeading);
+  const flagList = document.createElement("ul");
+  if (flags.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "(none on file)";
+    flagList.appendChild(li);
+  } else {
+    flags.forEach(function(q) {
+      const li = document.createElement("li");
+      li.textContent = q.quality_status + " — " + q.flag_reason + " (flagged by " + q.flagged_by + " at " + q.flagged_at + ")";
+      flagList.appendChild(li);
+    });
+  }
+  body.appendChild(flagList);
+
+  const runBtn = makeBtn("Run");
+  runBtn.addEventListener("click", function() { runCase(batch); });
+  body.appendChild(runBtn);
+
+  const outputDiv = document.createElement("div");
+  if (state.status === "not_run") {
+    outputDiv.textContent = "(not run yet)";
+  } else if (state.status === "running") {
+    outputDiv.textContent = "Running...";
+  } else if (state.status === "error") {
+    outputDiv.textContent = state.message;
+  } else if (state.status === "done") {
+    renderParsedResult(outputDiv, batch, state);
+  }
+  body.appendChild(outputDiv);
+}
+
+function refreshIfSelected(batchId) {
+  if (SELECTED_BATCH_ID === batchId) renderMainPanel();
+}
+
+/* ═══ RUN A CASE ═══ */
+async function runCase(batch) {
+  const state = CASE_STATE[batch.batch_id];
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+
   if (!apiKey) {
-    outputEl.textContent = "Error: no API key saved. Add your Anthropic API key in Settings above, then try again.";
+    state.status = "error";
+    state.message = "Error: no API key saved. Add your Anthropic API key in Settings above, then try again.";
+    refreshIfSelected(batch.batch_id);
     return "error";
   }
 
-  outputEl.textContent = "Running...";
+  state.status = "running";
+  refreshIfSelected(batch.batch_id);
 
   const context = buildCaseContext(batch);
   const userMessage = "Case:\n" + JSON.stringify(context, null, 2) +
@@ -532,119 +941,38 @@ async function runCase(batch, outputEl) {
         errText = await response.text();
       }
       if (response.status === 401) {
-        outputEl.textContent = "Error: the API key was rejected (401 unauthorized). Check the key in Settings.";
+        state.message = "Error: the API key was rejected (401 unauthorized). Check the key in Settings.";
       } else if (response.status === 429) {
-        outputEl.textContent = "Error: rate limited or out of credit (429). " + errText;
+        state.message = "Error: rate limited or out of credit (429). " + errText;
       } else {
-        outputEl.textContent = "Error (" + response.status + "): " + errText;
+        state.message = "Error (" + response.status + "): " + errText;
       }
+      state.status = "error";
+      refreshIfSelected(batch.batch_id);
       return "error";
     }
 
     const data = await response.json();
     const text = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : JSON.stringify(data);
-    const parsed = renderParsedOutput(outputEl, text, batch);
+    const parsed = parseAgentOutput(text);
+
+    state.status = "done";
+    state.rawText = text;
+    state.parsed = parsed;
+    state.humanAction = null;
+    refreshIfSelected(batch.batch_id);
+
     if (!parsed.ok) return "malformed";
     return parsed.fields.status.indexOf("REFUSED-ESCALATE") === 0 ? "refused" : "ok";
   } catch (err) {
-    outputEl.textContent = "Error: could not reach the API. Check your internet connection. (" + err.message + ")";
+    state.status = "error";
+    state.message = "Error: could not reach the API. Check your internet connection. (" + err.message + ")";
+    refreshIfSelected(batch.batch_id);
     return "error";
   }
 }
 
-// Render: policy file names
-const policyList = document.getElementById("policy-list");
-POLICY_FILES.forEach(function(p) {
-  const li = document.createElement("li");
-  li.textContent = "policies/" + p.filename;
-  policyList.appendChild(li);
-});
-
-// Render: batches with linked forecast, distance, and quality-flag records
-const batchesDiv = document.getElementById("batches");
-const RUN_TARGETS = [];
-BATCHES.forEach(function(batch) {
-  const wrapper = document.createElement("div");
-
-  const heading = document.createElement("h3");
-  heading.textContent = batch.batch_id + " — " + batch.sku_name + " @ " + batch.store_name;
-  wrapper.appendChild(heading);
-
-  const summary = document.createElement("ul");
-  summary.innerHTML =
-    "<li>Expiry: " + batch.expiry_date + " (" + batch.hours_to_expiry + "h remaining)</li>" +
-    "<li>On hand: " + batch.on_hand_qty + " units</li>" +
-    "<li>Quality status: " + batch.quality_status + "</li>" +
-    "<li>Previously transferred: " + batch.previously_transferred + "</li>" +
-    "<li>Returned from customer: " + batch.returned_from_customer + "</li>";
-  wrapper.appendChild(summary);
-
-  const forecasts = DEMAND_FORECAST.filter(function(f) { return f.batch_id === batch.batch_id; });
-  const forecastHeading = document.createElement("p");
-  forecastHeading.textContent = "Linked demand forecast:";
-  wrapper.appendChild(forecastHeading);
-  const forecastList = document.createElement("ul");
-  forecasts.forEach(function(f) {
-    const li = document.createElement("li");
-    li.textContent = f.store_id + ": predicted " + f.predicted_demand_units + " units, pre-labeled expected " +
-      f.pre_labeled_expected_demand_units + " units, confidence " + f.forecast_confidence + " (" + f.notes + ")";
-    forecastList.appendChild(li);
-  });
-  wrapper.appendChild(forecastList);
-
-  const distances = STORE_DISTANCES.filter(function(d) {
-    return d.store_a_id === batch.store_id || d.store_b_id === batch.store_id;
-  });
-  const distanceHeading = document.createElement("p");
-  distanceHeading.textContent = "Linked store distances from " + batch.store_id + ":";
-  wrapper.appendChild(distanceHeading);
-  const distanceList = document.createElement("ul");
-  distances.forEach(function(d) {
-    const otherName = d.store_a_id === batch.store_id ? d.store_b_name : d.store_a_name;
-    const otherId = d.store_a_id === batch.store_id ? d.store_b_id : d.store_a_id;
-    const li = document.createElement("li");
-    li.textContent = otherId + " (" + otherName + "): " + d.distance_km + " km, " + d.transport_time_min + " min transport";
-    distanceList.appendChild(li);
-  });
-  wrapper.appendChild(distanceList);
-
-  const flags = QUALITY_FLAGS.filter(function(q) { return q.batch_id === batch.batch_id; });
-  const flagHeading = document.createElement("p");
-  flagHeading.textContent = "Linked quality flag:";
-  wrapper.appendChild(flagHeading);
-  const flagList = document.createElement("ul");
-  if (flags.length === 0) {
-    const li = document.createElement("li");
-    li.textContent = "(none on file)";
-    flagList.appendChild(li);
-  } else {
-    flags.forEach(function(q) {
-      const li = document.createElement("li");
-      li.textContent = q.quality_status + " — " + q.flag_reason + " (flagged by " + q.flagged_by + " at " + q.flagged_at + ")";
-      flagList.appendChild(li);
-    });
-  }
-  wrapper.appendChild(flagList);
-
-  const runBtn = document.createElement("button");
-  runBtn.type = "button";
-  runBtn.textContent = "Run";
-  wrapper.appendChild(runBtn);
-
-  const outputDiv = document.createElement("div");
-  outputDiv.textContent = "(not run yet)";
-  wrapper.appendChild(outputDiv);
-
-  runBtn.addEventListener("click", function() {
-    runCase(batch, outputDiv);
-  });
-
-  RUN_TARGETS.push({ batch: batch, outputEl: outputDiv });
-
-  wrapper.appendChild(document.createElement("hr"));
-  batchesDiv.appendChild(wrapper);
-});
-
+/* ═══ RUN ALL ═══ */
 async function runAllCases() {
   const runAllBtn = document.getElementById("run-all-btn");
   const progressEl = document.getElementById("run-all-progress");
@@ -654,14 +982,14 @@ async function runAllCases() {
   summaryEl.textContent = "";
   const counts = { ok: 0, refused: 0, malformed: 0, error: 0 };
 
-  for (let i = 0; i < RUN_TARGETS.length; i++) {
-    const target = RUN_TARGETS[i];
-    progressEl.textContent = "Running " + (i + 1) + " of " + RUN_TARGETS.length + ": " + target.batch.batch_id + "...";
-    const outcome = await runCase(target.batch, target.outputEl);
+  for (let i = 0; i < BATCHES.length; i++) {
+    const batch = BATCHES[i];
+    progressEl.textContent = "Running " + (i + 1) + " of " + BATCHES.length + ": " + batch.batch_id + "...";
+    const outcome = await runCase(batch);
     counts[outcome] = (counts[outcome] || 0) + 1;
   }
 
-  progressEl.textContent = "Done: " + RUN_TARGETS.length + " of " + RUN_TARGETS.length + " cases run.";
+  progressEl.textContent = "Done: " + BATCHES.length + " of " + BATCHES.length + " cases run.";
   summaryEl.textContent = "OK: " + counts.ok +
     " | REFUSED-ESCALATE: " + counts.refused +
     " | Errors: " + (counts.error + counts.malformed) +
@@ -670,6 +998,11 @@ async function runAllCases() {
 }
 
 document.getElementById("run-all-btn").addEventListener("click", runAllCases);
+
+/* ═══ INIT ═══ */
+updateTopbarMeta();
+renderCaseList();
+renderMainPanel();
 
 </script>
 </body>
