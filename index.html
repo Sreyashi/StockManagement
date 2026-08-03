@@ -677,9 +677,9 @@ const EVAL_RESULTS_DEFAULTS = {
     lastRunAt: null
   },
   "EVAL-03": {
-    actual: "OK - Recommended ST03 (20 units) as the destination with genuine unmet need (0 existing inventory vs 20 demand); hero store ST04 (140 existing vs 180 demand, 40 units net room) was passed over.",
-    verdict: "needs_work",
-    notes: "Hero store had more absorption capacity (40 units net room vs ST03's 20) - agent should have picked ST04, not ST03, which only 'won' because it started at zero inventory.",
+    actual: "OK - Recommended ST04 hero store (40 units) as the destination with the highest unmet need (180 demand - 140 inventory = 40 net units), correctly ranking above ST03 (20 units unmet demand) and ST02 (-75 units, already well-stocked).",
+    verdict: "pass",
+    notes: "FIXED in Prompt 19: Section 2 updated to always include hero stores in the eligibility pool (not gated behind 'no within-10km can absorb'). Section 3 ranking now correctly precomputes unmet_need_units for all candidates and ranks by this net figure. Agent now picks ST04 (40 units) over ST03 (20 units) as intended.",
     lastRunAt: null
   },
   "EVAL-04": {
