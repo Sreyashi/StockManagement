@@ -348,6 +348,15 @@ body {
 <script>
 const MODEL = "claude-sonnet-4-5";
 const API_URL = "https://api.anthropic.com/v1/messages";
+const CORS_PROXY = "https://corsproxy.io/?";
+
+function getApiUrl() {
+  // Use CORS proxy if running from https (GitHub Pages)
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && window.location.hostname.includes('github')) {
+    return CORS_PROXY + encodeURIComponent(API_URL);
+  }
+  return API_URL;
+}
 
 const BATCHES = [
   {batch_id:"BAT-001", sku_id:"SKU02", sku_name:"Full Cream Milk 1L", store_id:"ST01", store_name:"Store A - Koramangala", manufactured_date:"2026-07-16", expiry_date:"2026-07-23", hours_to_expiry:44, on_hand_qty:120, quality_status:"ok", previously_transferred:false, returned_from_customer:false},
@@ -414,7 +423,8 @@ async function runCase(batchId) {
   }
 
   try {
-    const response = await fetch(API_URL, {
+    const apiUrl = getApiUrl();
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
